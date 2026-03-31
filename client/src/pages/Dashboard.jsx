@@ -34,7 +34,7 @@ const Dashboard = () => {
               <div className="p-2 bg-indigo-600 rounded-lg">
                 <LayoutDashboard className="h-6 w-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900 tracking-tight">InventoryHub</span>
+              <span className="text-xl font-bold text-gray-900 tracking-tight">Inventory Management</span>
             </div>
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2 text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">

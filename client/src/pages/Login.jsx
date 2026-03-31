@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, Lock, Mail, Loader2, Package, BarChart3, ShieldCheck } from 'lucide-react';
+import { ArrowRight, BarChart3, Eye, EyeOff, Loader2, Lock, LogIn, Mail, Package, ShieldCheck } from 'lucide-react';
 import { ROLES } from '../constants/roles';
 import heroImage from '../assets/hero.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [saveUser, setSaveUser] = useState(true);
@@ -43,65 +44,69 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.15),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(16,185,129,0.12),transparent_60%)]">
       <div className="mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_-18px_rgba(2,6,23,0.25)]">
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.12),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(16,185,129,0.10),transparent_58%)]" />
-          <div className="relative grid grid-cols-1 lg:grid-cols-2">
-            <div className="hidden lg:flex flex-col justify-between p-10">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-700">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white">
-                    <LogIn className="h-4 w-4" />
-                  </span>
-                  Inventory Management Suite
+        <div className="w-full">
+          <div className="rounded-3xl bg-gradient-to-br from-slate-200/70 via-white to-slate-200/50 p-[1px] shadow-[0_18px_55px_-28px_rgba(2,6,23,0.45)]">
+            <div className="relative overflow-hidden rounded-3xl bg-white">
+              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.10),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(2,6,23,0.04),transparent_58%)]" />
+              <div className="relative grid grid-cols-1 lg:grid-cols-2">
+                <div className="hidden lg:flex flex-col justify-between p-10">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white">
+                        <LogIn className="h-4 w-4" />
+                      </span>
+                      Inventory Management Suite
+                    </div>
+                    <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
+                      Track stock, assets, and workflows in one place.
+                    </h1>
+                    <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
+                      Secure sign-in for warehouse teams, project managers, and admins. Stay compliant with role-based
+                      access and real-time visibility.
+                    </p>
+                    <div className="mt-8 space-y-3">
+                      <div className="flex items-center gap-3 text-sm text-slate-700">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
+                          <Package className="h-4 w-4" />
+                        </span>
+                        Item-level tracking with clean audit history
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-slate-700">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                          <BarChart3 className="h-4 w-4" />
+                        </span>
+                        Live dashboards for inventory health
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-slate-700">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900/10 text-slate-800">
+                          <ShieldCheck className="h-4 w-4" />
+                        </span>
+                        Role-based access for safer operations
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <img
+                      src={heroImage}
+                      alt="Inventory management illustration"
+                      className="h-56 w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
                 </div>
-                <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
-                  Track stock, assets, and workflows in one place.
-                </h1>
-                <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-                  Secure sign-in for warehouse teams, project managers, and admins. Stay compliant with role-based
-                  access and real-time visibility.
-                </p>
-                <div className="mt-8 space-y-3">
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
-                      <Package className="h-4 w-4" />
-                    </span>
-                    Item-level tracking with clean audit history
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
-                      <BarChart3 className="h-4 w-4" />
-                    </span>
-                    Live dashboards for inventory health
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-700">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900/10 text-slate-800">
-                      <ShieldCheck className="h-4 w-4" />
-                    </span>
-                    Role-based access for safer operations
-                  </div>
-                </div>
-              </div>
-              <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                <img
-                  src={heroImage}
-                  alt="Inventory management illustration"
-                  className="h-56 w-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-            </div>
 
-            <div className="p-6 sm:p-10">
+                <div className="p-6 sm:p-10">
               <div className="mx-auto w-full max-w-md">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
                       <LogIn className="h-5 w-5" />
                     </div>
                     <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Secure access</p>
                       <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Sign in</h2>
                       <p className="text-xs text-slate-600">Use your work email and password.</p>
                     </div>
@@ -153,14 +158,22 @@ const Login = () => {
                       <input
                         id="password"
                         name="password"
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         autoComplete="current-password"
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 pr-12 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
                         placeholder="Enter your password"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 inline-flex items-center justify-center rounded-r-xl px-3 text-slate-500 transition hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -189,7 +202,10 @@ const Login = () => {
                         Signing in…
                       </>
                     ) : (
-                      'Sign in'
+                      <>
+                        Sign in
+                        <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                      </>
                     )}
                   </button>
 
@@ -198,6 +214,8 @@ const Login = () => {
                   </div>
                 </form>
               </div>
+            </div>
+          </div>
             </div>
           </div>
         </div>
