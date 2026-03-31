@@ -4,6 +4,7 @@ const { ROLES } = require('../constants/roles');
 const Project = require('../models/Project');
 const Asset = require('../models/Asset');
 const InventoryLog = require('../models/InventoryLog');
+const { recordAuditLog } = require('../utils/recordAuditLog');
 
 const router = express.Router();
 
@@ -58,6 +59,18 @@ router.post('/', authMiddleware, canEditProjects, async (req, res) => {
     });
     await project.save();
 
+    await recordAuditLog({
+      req,
+      action: 'PROJECT_CREATE',
+      entityType: 'Project',
+      entityId: project._id,
+      details: {
+        code: project.code,
+        name: project.name,
+        status: project.status
+      }
+    });
+
     res.status(201).json({ project });
   } catch (error) {
     res.status(500).json({ message: 'Failed to create project', error: error.message });
@@ -107,6 +120,21 @@ router.post('/:projectId/materials/upsert', authMiddleware, canEditProjects, asy
     }
 
     await project.save();
+
+    await recordAuditLog({
+      req,
+      action: 'PROJECT_MATERIALS_PLAN_UPSERT',
+      entityType: 'Project',
+      entityId: project._id,
+      details: {
+        projectCode: project.code,
+        assetId: asset.assetId,
+        sku: asset.sku,
+        itemName: asset.itemName,
+        plannedQuantity: nextPlanned
+      }
+    });
+
     res.json({ project });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update planned materials', error: error.message });
@@ -155,6 +183,22 @@ router.post('/:projectId/materials/allocate', authMiddleware, canEditProjects, a
     await assetDoc.save();
     await project.save();
 
+    await recordAuditLog({
+      req,
+      action: 'PROJECT_MATERIALS_ALLOCATE',
+      entityType: 'Project',
+      entityId: project._id,
+      details: {
+        projectCode: project.code,
+        assetId: assetDoc.assetId,
+        sku: assetDoc.sku,
+        itemName: assetDoc.itemName,
+        quantity: qty,
+        assetAvailableQuantity: assetDoc.availableQuantity,
+        assetAllocatedQuantity: assetDoc.allocatedQuantity
+      }
+    });
+
     res.json({ project, asset: assetDoc });
   } catch (error) {
     res.status(500).json({ message: 'Failed to allocate materials', error: error.message });
@@ -178,6 +222,7 @@ router.post('/:projectId/materials/used', authMiddleware, canEditProjects, async
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
     const idx = project.materials.findIndex((m) => m.assetId === asset.assetId);
+    let delta = nextUsed;
     if (idx === -1) {
       project.materials.push({
         assetId: asset.assetId,
@@ -186,16 +231,133 @@ router.post('/:projectId/materials/used', authMiddleware, canEditProjects, async
         unit: asset.unit || 'pcs',
         plannedQuantity: 0,
         allocatedQuantity: 0,
-        usedQuantityOverride: nextUsed
+        usedQuantityOverride: nextUsed,
+        usageEvents: [
+          {
+            source: 'manual',
+            delta: nextUsed,
+            usedTotal: nextUsed,
+            performedBy: req.user.email || req.user.username || req.user.id
+          }
+        ]
       });
     } else {
+      const prevTotal = project.materials[idx].usedQuantityOverride ?? 0;
+      delta = nextUsed - Number(prevTotal);
       project.materials[idx].usedQuantityOverride = nextUsed;
+      project.materials[idx].usageEvents = project.materials[idx].usageEvents || [];
+      project.materials[idx].usageEvents.push({
+        source: 'manual',
+        delta,
+        usedTotal: nextUsed,
+        performedBy: req.user.email || req.user.username || req.user.id
+      });
     }
 
     await project.save();
+
+    await recordAuditLog({
+      req,
+      action: 'PROJECT_MATERIALS_USED_OVERRIDE',
+      entityType: 'Project',
+      entityId: project._id,
+      details: {
+        projectCode: project.code,
+        assetId: asset.assetId,
+        sku: asset.sku,
+        itemName: asset.itemName,
+        usedTotal: nextUsed,
+        delta
+      }
+    });
+
     res.json({ project });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update used materials', error: error.message });
+  }
+});
+
+router.get('/:projectId/consumption', authMiddleware, canViewProjects, async (req, res) => {
+  try {
+    const { limit = 20, page = 1, search } = req.query;
+    const project = await Project.findById(req.params.projectId);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canAccessProject(req, project)) return res.status(403).json({ message: 'Access denied. You do not have permission.' });
+
+    const parsedLimit = Math.min(100, Math.max(1, Number(limit)));
+    const parsedPage = Math.max(1, Number(page));
+
+    const logQuery = { projectId: project._id, type: 'OUT' };
+    if (search) {
+      logQuery.$or = [
+        { itemName: { $regex: search, $options: 'i' } },
+        { sku: { $regex: search, $options: 'i' } },
+        { assetId: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const logs = await InventoryLog.find(logQuery).sort({ timestamp: -1, createdAt: -1 }).limit(500);
+
+    const manualEvents = [];
+    for (const m of project.materials || []) {
+      for (const ev of m.usageEvents || []) {
+        const row = {
+          source: 'manual',
+          type: 'USED_UPDATE',
+          assetId: m.assetId,
+          sku: m.sku,
+          itemName: m.itemName,
+          unit: m.unit || 'pcs',
+          quantity: ev.delta,
+          usedTotal: ev.usedTotal,
+          performedBy: ev.performedBy || '',
+          timestamp: ev.timestamp || new Date()
+        };
+        manualEvents.push(row);
+      }
+    }
+
+    let combined = [
+      ...logs.map((l) => ({
+        source: 'stock_out',
+        type: 'OUT',
+        assetId: l.assetId,
+        sku: l.sku,
+        itemName: l.itemName,
+        unit: '',
+        quantity: l.quantity,
+        usedTotal: null,
+        performedBy: l.performedBy || '',
+        timestamp: l.timestamp || l.createdAt
+      })),
+      ...manualEvents
+    ];
+
+    if (search) {
+      const s = String(search).toLowerCase();
+      combined = combined.filter((e) => {
+        return (
+          String(e.itemName || '').toLowerCase().includes(s) ||
+          String(e.sku || '').toLowerCase().includes(s) ||
+          String(e.assetId || '').toLowerCase().includes(s)
+        );
+      });
+    }
+
+    combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    const start = (parsedPage - 1) * parsedLimit;
+    const paged = combined.slice(start, start + parsedLimit);
+
+    res.json({
+      project: { id: project._id, code: project.code, name: project.name },
+      events: paged,
+      totalEvents: combined.length,
+      totalPages: Math.ceil(combined.length / parsedLimit),
+      currentPage: parsedPage
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch consumption history', error: error.message });
   }
 });
 

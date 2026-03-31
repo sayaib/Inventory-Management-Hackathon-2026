@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { recordAuditLog } = require('../utils/recordAuditLog');
 
 const router = express.Router();
 
@@ -16,6 +17,16 @@ router.post('/register', async (req, res) => {
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
+    let requester = null;
+    const bearer = req.header('Authorization')?.split(' ')[1];
+    if (bearer) {
+      try {
+        requester = jwt.verify(bearer, JWT_SECRET);
+      } catch (e) {
+        requester = null;
+      }
+    }
+
     // Restrict registration of Admin role
     if (role === ROLES.ADMIN) {
       return res.status(403).json({ message: 'Cannot register as Admin' });
@@ -28,6 +39,26 @@ router.post('/register', async (req, res) => {
       role: role || ROLES.INVENTORY_MANAGER 
     });
     await newUser.save();
+
+    const actor = requester
+      ? { userId: requester.id, username: requester.username || '', email: requester.email || '', role: requester.role || '' }
+      : { userId: newUser._id, username: newUser.username, email: newUser.email, role: newUser.role };
+
+    await recordAuditLog({
+      req,
+      actor,
+      action: requester ? 'USER_CREATE' : 'AUTH_REGISTER',
+      entityType: 'User',
+      entityId: newUser._id,
+      details: {
+        createdUser: {
+          id: newUser._id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role
+        }
+      }
+    });
 
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
@@ -50,6 +81,15 @@ router.post('/login', async (req, res) => {
       JWT_SECRET,
       { expiresIn: '1h' }
     );
+
+    await recordAuditLog({
+      req,
+      actor: { userId: user._id, username: user.username, email: user.email, role: user.role },
+      action: 'AUTH_LOGIN',
+      entityType: 'User',
+      entityId: user._id,
+      details: { email: user.email }
+    });
 
     res.json({
       token,
@@ -141,6 +181,15 @@ router.post('/profile', authMiddleware, async (req, res) => {
     await user.save();
 
     const safeUser = await User.findById(user._id).select('-password');
+
+    await recordAuditLog({
+      req,
+      action: 'PROFILE_CREATE',
+      entityType: 'User',
+      entityId: user._id,
+      details: { updates: { username: req.body?.username, ...incomingProfile } }
+    });
+
     res.status(201).json(safeUser);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create profile', error: error.message });
@@ -171,6 +220,15 @@ router.put('/profile', authMiddleware, async (req, res) => {
     await user.save();
 
     const safeUser = await User.findById(user._id).select('-password');
+
+    await recordAuditLog({
+      req,
+      action: 'PROFILE_UPDATE',
+      entityType: 'User',
+      entityId: user._id,
+      details: { updates: { username: req.body?.username, ...incomingProfile } }
+    });
+
     res.json(safeUser);
   } catch (error) {
     res.status(500).json({ message: 'Failed to update profile', error: error.message });
@@ -189,6 +247,15 @@ router.delete('/profile', authMiddleware, async (req, res) => {
     await user.save();
 
     const safeUser = await User.findById(user._id).select('-password');
+
+    await recordAuditLog({
+      req,
+      action: 'PROFILE_CLEAR',
+      entityType: 'User',
+      entityId: user._id,
+      details: {}
+    });
+
     res.json(safeUser);
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete profile data', error: error.message });

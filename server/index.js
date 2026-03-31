@@ -20,9 +20,11 @@ app.get('/', (req, res) => {
 const authRoutes = require('./routes/auth');
 const inventoryRoutes = require('./routes/inventory');
 const projectRoutes = require('./routes/projects');
+const auditLogRoutes = require('./routes/auditLogs');
 app.use('/api/auth', authRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // Database Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_db';

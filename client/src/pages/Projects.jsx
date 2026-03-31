@@ -10,6 +10,7 @@ const Projects = () => {
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [loadingConsumption, setLoadingConsumption] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -18,6 +19,9 @@ const Projects = () => {
   const [allocateForm, setAllocateForm] = useState({ assetIdOrSku: '', quantity: 1 });
   const [usedForm, setUsedForm] = useState({ assetIdOrSku: '', usedQuantity: 0 });
   const [assets, setAssets] = useState([]);
+  const [consumption, setConsumption] = useState({ events: [], totalPages: 1, currentPage: 1 });
+  const [consumptionPage, setConsumptionPage] = useState(1);
+  const [consumptionSearch, setConsumptionSearch] = useState('');
 
   const selectedProject = useMemo(() => {
     return projects.find((p) => p._id === selectedProjectId) || null;
@@ -86,6 +90,29 @@ const Projects = () => {
     }
   }, []);
 
+  const fetchConsumption = useCallback(async (projectId) => {
+    if (!projectId) return;
+    setLoadingConsumption(true);
+    try {
+      const res = await api.get(`/projects/${projectId}/consumption`, {
+        params: {
+          page: consumptionPage,
+          limit: 20,
+          search: consumptionSearch || undefined
+        }
+      });
+      setConsumption({
+        events: res.data.events || [],
+        totalPages: res.data.totalPages || 1,
+        currentPage: res.data.currentPage || 1
+      });
+    } catch (err) {
+      console.error('Failed to fetch consumption history', err);
+    } finally {
+      setLoadingConsumption(false);
+    }
+  }, [consumptionPage, consumptionSearch]);
+
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
@@ -93,6 +120,10 @@ const Projects = () => {
   useEffect(() => {
     if (selectedProjectId) fetchSummary(selectedProjectId);
   }, [fetchSummary, selectedProjectId]);
+
+  useEffect(() => {
+    if (selectedProjectId) fetchConsumption(selectedProjectId);
+  }, [fetchConsumption, selectedProjectId]);
 
   useEffect(() => {
     fetchAllAssets();
@@ -163,6 +194,7 @@ const Projects = () => {
       setUsedForm({ assetIdOrSku: '', usedQuantity: 0 });
       setSuccess('Used quantity updated');
       fetchSummary(selectedProjectId);
+      fetchConsumption(selectedProjectId);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update used quantity');
     }
@@ -513,6 +545,103 @@ const Projects = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-extrabold text-gray-900">Consumption History</h2>
+              <p className="text-xs text-gray-500">Shows Stock Out logs + manual used updates.</p>
+            </div>
+            <input
+              value={consumptionSearch}
+              onChange={(e) => { setConsumptionSearch(e.target.value); setConsumptionPage(1); }}
+              placeholder="Search material..."
+              className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {loadingConsumption ? (
+            <div className="text-sm text-gray-500 py-8">Loading history…</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date</th>
+                    <th className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Material</th>
+                    <th className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Source</th>
+                    <th className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Qty</th>
+                    <th className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Used Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {(consumption.events || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-10 text-center text-sm text-gray-500">
+                        No history yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    (consumption.events || []).map((e, i) => (
+                      <tr key={`${e.source}-${e.assetId}-${e.sku}-${new Date(e.timestamp).getTime()}-${i}`} className="hover:bg-gray-50 transition-colors">
+                        <td className="py-3 text-xs text-gray-500 font-medium">
+                          {new Date(e.timestamp).toLocaleString()}
+                        </td>
+                        <td className="py-3">
+                          <div className="font-extrabold text-sm text-gray-900">{e.itemName}</div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+                            {e.assetId} • {e.sku}
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          {e.source === 'stock_out' ? (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-50 text-red-600">
+                              Stock Out
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700">
+                              Manual
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 font-bold text-sm text-gray-700">
+                          {e.quantity}
+                        </td>
+                        <td className="py-3 font-bold text-sm text-gray-700">
+                          {e.usedTotal === null || e.usedTotal === undefined ? '-' : e.usedTotal}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {consumption.totalPages > 1 && (
+            <div className="flex justify-center items-center gap-3 pt-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                disabled={consumptionPage <= 1}
+                onClick={() => setConsumptionPage((p) => Math.max(1, p - 1))}
+              >
+                Prev
+              </button>
+              <div className="text-xs font-bold text-gray-500">
+                Page {consumption.currentPage} of {consumption.totalPages}
+              </div>
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                disabled={consumptionPage >= consumption.totalPages}
+                onClick={() => setConsumptionPage((p) => Math.min(consumption.totalPages, p + 1))}
+              >
+                Next
+              </button>
             </div>
           )}
         </div>

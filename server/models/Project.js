@@ -7,7 +7,19 @@ const projectMaterialSchema = new mongoose.Schema({
   unit: { type: String, default: 'pcs' },
   plannedQuantity: { type: Number, default: 0, min: 0 },
   allocatedQuantity: { type: Number, default: 0, min: 0 },
-  usedQuantityOverride: { type: Number, default: null }
+  usedQuantityOverride: { type: Number, default: null },
+  usageEvents: {
+    type: [
+      {
+        source: { type: String, enum: ['manual'], required: true },
+        delta: { type: Number, required: true },
+        usedTotal: { type: Number, required: true },
+        performedBy: { type: String, default: '' },
+        timestamp: { type: Date, default: Date.now }
+      }
+    ],
+    default: []
+  }
 }, { _id: false });
 
 const projectSchema = new mongoose.Schema({

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogIn, User, Lock, Mail, Loader2 } from 'lucide-react';
+import { LogIn, Lock, Mail, Loader2, Package, BarChart3, ShieldCheck } from 'lucide-react';
 import { ROLES } from '../constants/roles';
+import heroImage from '../assets/hero.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveUser, setSaveUser] = useState(true);
   const { login, user: authUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -27,7 +29,7 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
+      const user = await login(email, password, { persist: saveUser });
       if (user.role === ROLES.ADMIN) {
         navigate('/admin');
       } else {
@@ -41,69 +43,164 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-sm w-full space-y-6 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-        <div className="text-center">
-          <div className="mx-auto h-10 w-10 bg-indigo-100 flex items-center justify-center rounded-full">
-            <LogIn className="h-5 w-5 text-indigo-600" />
-          </div>
-          <h2 className="mt-4 text-2xl font-extrabold text-gray-900">Sign in</h2>
-          <p className="mt-1 text-xs text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Register here
-            </Link>
-          </p>
-        </div>
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-lg">
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
-          )}
-          <div className="space-y-3">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Mail className="h-4 w-4 text-gray-400" />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+      <div className="mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
+        <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_-18px_rgba(2,6,23,0.25)]">
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.12),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(16,185,129,0.10),transparent_58%)]" />
+          <div className="relative grid grid-cols-1 lg:grid-cols-2">
+            <div className="hidden lg:flex flex-col justify-between p-10">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-700">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white">
+                    <LogIn className="h-4 w-4" />
+                  </span>
+                  Inventory Management Suite
+                </div>
+                <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
+                  Track stock, assets, and workflows in one place.
+                </h1>
+                <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
+                  Secure sign-in for warehouse teams, project managers, and admins. Stay compliant with role-based
+                  access and real-time visibility.
+                </p>
+                <div className="mt-8 space-y-3">
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
+                      <Package className="h-4 w-4" />
+                    </span>
+                    Item-level tracking with clean audit history
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                      <BarChart3 className="h-4 w-4" />
+                    </span>
+                    Live dashboards for inventory health
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-slate-700">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900/10 text-slate-800">
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                    Role-based access for safer operations
+                  </div>
+                </div>
               </div>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
-                placeholder="Email address"
-              />
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-4 w-4 text-gray-400" />
+              <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                <img
+                  src={heroImage}
+                  alt="Inventory management illustration"
+                  className="h-56 w-full object-cover"
+                  loading="lazy"
+                />
               </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
-                placeholder="Password"
-              />
             </div>
-          </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 className="animate-spin h-4 w-4 mr-2" />
-              ) : (
-                'Sign in'
-              )}
-            </button>
+            <div className="p-6 sm:p-10">
+              <div className="mx-auto w-full max-w-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                      <LogIn className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Sign in</h2>
+                      <p className="text-xs text-slate-600">Use your work email and password.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+                  {error && (
+                    <div
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                      role="alert"
+                      aria-live="polite"
+                    >
+                      {error}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="text-sm font-semibold text-slate-800">
+                      Email
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Mail className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        inputMode="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                        placeholder="name@company.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="password" className="text-sm font-semibold text-slate-800">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Lock className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autoComplete="current-password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                        placeholder="Enter your password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm text-slate-700" htmlFor="saveUser">
+                      <input
+                        id="saveUser"
+                        name="saveUser"
+                        type="checkbox"
+                        checked={saveUser}
+                        onChange={(e) => setSaveUser(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-4 focus:ring-indigo-600/20"
+                      />
+                      Save user on this device
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-600/25 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Signing in…
+                      </>
+                    ) : (
+                      'Sign in'
+                    )}
+                  </button>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                    By continuing, you agree to follow your organization’s security policies.
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

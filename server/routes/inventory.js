@@ -4,6 +4,7 @@ const InventoryLog = require('../models/InventoryLog');
 const Project = require('../models/Project');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { ROLES } = require('../constants/roles');
+const { recordAuditLog } = require('../utils/recordAuditLog');
 
 const router = express.Router();
 
@@ -155,6 +156,21 @@ router.post('/add', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN
 
     const newAsset = new Asset(assetData);
     await newAsset.save();
+
+    await recordAuditLog({
+      req,
+      action: 'INVENTORY_ASSET_CREATE',
+      entityType: 'Asset',
+      entityId: newAsset._id,
+      details: {
+        assetId: newAsset.assetId,
+        sku: newAsset.sku,
+        itemName: newAsset.itemName,
+        department: newAsset.department,
+        totalQuantity: newAsset.totalQuantity,
+        availableQuantity: newAsset.availableQuantity
+      }
+    });
     
     res.status(201).json({ message: 'Asset created successfully', asset: newAsset });
   } catch (error) {
@@ -233,6 +249,24 @@ router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, RO
     });
     await log.save();
 
+    await recordAuditLog({
+      req,
+      action: type === 'IN' ? 'INVENTORY_STOCK_IN' : 'INVENTORY_STOCK_OUT',
+      entityType: 'Asset',
+      entityId: asset._id,
+      details: {
+        assetId: asset.assetId,
+        sku: asset.sku,
+        itemName: asset.itemName,
+        quantity: qty,
+        type,
+        projectId: project?._id,
+        projectName: project?.name || '',
+        previousQuantity,
+        newQuantity: asset.totalQuantity
+      }
+    });
+
     res.json({ message: `Stock ${type === 'IN' ? 'added' : 'removed'} successfully`, asset, log });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update stock', error: error.message });
@@ -254,6 +288,19 @@ router.put('/update/:id', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES
 
     const updatedAsset = await Asset.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!updatedAsset) return res.status(404).json({ message: 'Asset not found' });
+
+    await recordAuditLog({
+      req,
+      action: 'INVENTORY_ASSET_UPDATE',
+      entityType: 'Asset',
+      entityId: updatedAsset._id,
+      details: {
+        assetId: updatedAsset.assetId,
+        sku: updatedAsset.sku,
+        itemName: updatedAsset.itemName,
+        changes: updateData
+      }
+    });
     
     res.json({ message: 'Asset updated successfully', asset: updatedAsset });
   } catch (error) {
@@ -266,6 +313,20 @@ router.delete('/delete/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), asyn
   try {
     const deletedAsset = await Asset.findByIdAndDelete(req.params.id);
     if (!deletedAsset) return res.status(404).json({ message: 'Asset not found' });
+
+    await recordAuditLog({
+      req,
+      action: 'INVENTORY_ASSET_DELETE',
+      entityType: 'Asset',
+      entityId: deletedAsset._id,
+      details: {
+        assetId: deletedAsset.assetId,
+        sku: deletedAsset.sku,
+        itemName: deletedAsset.itemName,
+        department: deletedAsset.department
+      }
+    });
+
     res.json({ message: 'Asset deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Failed to delete asset', error: error.message });
