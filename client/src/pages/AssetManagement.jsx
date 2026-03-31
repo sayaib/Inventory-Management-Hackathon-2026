@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -99,11 +99,7 @@ const AssetManagement = () => {
     metadata: {}
   });
 
-  useEffect(() => {
-    fetchAssets();
-  }, [currentPage, filterDept, startDate, endDate, searchTerm, showLowStockOnly]);
-
-  const fetchAssets = async () => {
+  const fetchAssets = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -129,7 +125,11 @@ const AssetManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, endDate, filterDept, searchTerm, showLowStockOnly, startDate]);
+
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;

@@ -12,6 +12,7 @@ import Unauthorized from './pages/Unauthorized';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ROLES } from './constants/roles';
 import Projects from './pages/Projects';
+import FinancePanel from './pages/FinancePanel';
 
 function App() {
   return (
@@ -39,6 +40,11 @@ function App() {
           {/* Warehouse Protected Routes */}
           <Route element={<ProtectedRoute allowedRoles={[ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]} />}>
             <Route path="/warehouse" element={<WarehousePanel />} />
+          </Route>
+
+          {/* Finance Protected Routes */}
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.FINANCE, ROLES.ADMIN]} />}>
+            <Route path="/finance" element={<FinancePanel />} />
           </Route>
 
           {/* Default Redirect */}

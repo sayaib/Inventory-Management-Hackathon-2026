@@ -83,6 +83,15 @@ const assetSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  costLots: [
+    {
+      quantity: { type: Number, required: true },
+      unitCost: { type: Number, required: true },
+      receivedAt: { type: Date, default: Date.now },
+      source: { type: String, default: 'purchase' },
+      reference: { type: String, default: '' }
+    }
+  ],
   vendorName: {
     type: String,
     trim: true

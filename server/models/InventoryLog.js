@@ -26,9 +26,34 @@ const inventoryLogSchema = new mongoose.Schema({
     enum: ['IN', 'OUT'],
     required: true
   },
+  reason: {
+    type: String,
+    enum: [
+      'PURCHASE',
+      'RETURN',
+      'ADJUSTMENT',
+      'CONSUMPTION',
+      'WASTAGE',
+      'EXPIRED',
+      'DAMAGED',
+      'SHRINKAGE'
+    ]
+  },
   quantity: {
     type: Number,
     required: true
+  },
+  unitCost: {
+    type: Number,
+    default: 0
+  },
+  totalCost: {
+    type: Number,
+    default: 0
+  },
+  notes: {
+    type: String,
+    default: ''
   },
   performedBy: {
     type: String,

@@ -48,11 +48,15 @@ const WarehousePanel = () => {
   const [manualSku, setManualSku] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [movementType, setMovementType] = useState('IN'); // 'IN' or 'OUT'
+  const [movementReason, setMovementReason] = useState('PURCHASE');
+  const [movementUnitCost, setMovementUnitCost] = useState('');
+  const [movementReference, setMovementReference] = useState('');
+  const [movementNotes, setMovementNotes] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [inventory, setInventory] = useState([]);
-  const [confirmUpdate, setConfirmUpdate] = useState(null); // { asset, type, quantity, projectId }
+  const [confirmUpdate, setConfirmUpdate] = useState(null); // { asset, type, quantity, projectId, reason, unitCost, reference, notes }
   const [projects, setProjects] = useState([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [movementProjectId, setMovementProjectId] = useState('');
@@ -150,7 +154,7 @@ const WarehousePanel = () => {
     try {
       const res = await api.get(`/inventory/id/${decodedText}`);
       if (res.data) {
-        if (movementType === 'OUT' && !movementProjectId) {
+        if (movementType === 'OUT' && movementReason === 'CONSUMPTION' && !movementProjectId) {
           setError('Select a project before processing Stock Out.');
           return;
         }
@@ -158,7 +162,11 @@ const WarehousePanel = () => {
           asset: res.data,
           type: movementType,
           quantity: Number(quantity),
-          projectId: movementType === 'OUT' ? movementProjectId : ''
+          projectId: movementType === 'OUT' ? movementProjectId : '',
+          reason: movementReason,
+          unitCost: movementUnitCost,
+          reference: movementReference,
+          notes: movementNotes
         });
       }
     } catch {
@@ -166,7 +174,7 @@ const WarehousePanel = () => {
     } finally {
       setLoading(false);
     }
-  }, [movementProjectId, movementType, quantity]);
+  }, [movementNotes, movementProjectId, movementReason, movementReference, movementType, movementUnitCost, quantity]);
 
   const onScanError = useCallback(() => {}, []);
 
@@ -193,7 +201,7 @@ const WarehousePanel = () => {
     setLoading(true);
 
     try {
-      if (movementType === 'OUT' && !movementProjectId) {
+      if (movementType === 'OUT' && movementReason === 'CONSUMPTION' && !movementProjectId) {
         setError('Select a project before processing Stock Out.');
         setLoading(false);
         return;
@@ -212,7 +220,11 @@ const WarehousePanel = () => {
         asset,
         type: movementType,
         quantity: Number(quantity),
-        projectId: movementType === 'OUT' ? movementProjectId : ''
+        projectId: movementType === 'OUT' ? movementProjectId : '',
+        reason: movementReason,
+        unitCost: movementUnitCost,
+        reference: movementReference,
+        notes: movementNotes
       });
     } catch (err) {
       setError(err.response?.data?.message || 'Asset not found or server error');
@@ -223,7 +235,7 @@ const WarehousePanel = () => {
 
   const performStockUpdate = async () => {
     if (!confirmUpdate) return;
-    const { asset, type, quantity, projectId } = confirmUpdate;
+    const { asset, type, quantity, projectId, reason, unitCost, reference, notes } = confirmUpdate;
     setLoading(true);
     setError('');
 
@@ -232,13 +244,20 @@ const WarehousePanel = () => {
         sku: asset.assetId, // Using assetId as the primary identifier
         quantityChange: quantity,
         type: type,
-        projectId: projectId || undefined
+        projectId: projectId || undefined,
+        reason: reason || undefined,
+        unitCost: type === 'IN' ? (unitCost || undefined) : undefined,
+        reference: type === 'IN' ? (reference || undefined) : undefined,
+        notes: notes || undefined
       });
       const message = `Successfully ${type === 'IN' ? 'added' : 'removed'} ${quantity} ${asset.unit || 'pcs'} of ${asset.itemName}.`;
       setSuccess(message);
       setLastAction({ message, type });
       setManualSku('');
       setQuantity(1);
+      setMovementUnitCost('');
+      setMovementReference('');
+      setMovementNotes('');
       setScanResult(null);
       setConfirmUpdate(null);
       fetchInventory();
@@ -449,7 +468,7 @@ const WarehousePanel = () => {
                 <div className="space-y-4">
                   <div className="flex space-x-2 p-1 bg-gray-100 rounded-xl">
                     <button 
-                      onClick={() => setMovementType('IN')}
+                      onClick={() => { setMovementType('IN'); setMovementReason('PURCHASE'); setMovementProjectId(''); }}
                       className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${
                         movementType === 'IN' ? 'bg-white text-emerald-600 shadow-sm font-bold' : 'text-gray-500 font-medium'
                       }`}
@@ -458,7 +477,7 @@ const WarehousePanel = () => {
                       <span className="text-sm">Stock In</span>
                     </button>
                     <button 
-                      onClick={() => setMovementType('OUT')}
+                      onClick={() => { setMovementType('OUT'); setMovementReason('CONSUMPTION'); }}
                       className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${
                         movementType === 'OUT' ? 'bg-white text-red-600 shadow-sm font-bold' : 'text-gray-500 font-medium'
                       }`}
@@ -538,16 +557,69 @@ const WarehousePanel = () => {
                           </div>
                         </div>
 
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Reason</label>
+                          <select
+                            value={movementReason}
+                            onChange={(e) => { setMovementReason(e.target.value); if (e.target.value !== 'CONSUMPTION') setMovementProjectId(''); }}
+                            className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                          >
+                            {movementType === 'IN' ? (
+                              <>
+                                <option value="PURCHASE">PURCHASE</option>
+                                <option value="RETURN">RETURN</option>
+                                <option value="ADJUSTMENT">ADJUSTMENT</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="CONSUMPTION">CONSUMPTION</option>
+                                <option value="WASTAGE">WASTAGE</option>
+                                <option value="EXPIRED">EXPIRED</option>
+                                <option value="DAMAGED">DAMAGED</option>
+                                <option value="SHRINKAGE">SHRINKAGE</option>
+                                <option value="ADJUSTMENT">ADJUSTMENT</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+
+                        {movementType === 'IN' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Unit Cost</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="Optional"
+                                value={movementUnitCost}
+                                onChange={(e) => setMovementUnitCost(e.target.value)}
+                                className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Reference</label>
+                              <input
+                                type="text"
+                                placeholder="Invoice / GRN (Optional)"
+                                value={movementReference}
+                                onChange={(e) => setMovementReference(e.target.value)}
+                                className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                              />
+                            </div>
+                          </div>
+                        )}
+
                         {movementType === 'OUT' && (
                           <div>
                             <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Project</label>
                             <select
-                              required
+                              required={movementReason === 'CONSUMPTION'}
                               value={movementProjectId}
                               onChange={(e) => setMovementProjectId(e.target.value)}
                               className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
                             >
-                              <option value="">{projectsLoading ? 'Loading projects…' : 'Select project'}</option>
+                              <option value="">{projectsLoading ? 'Loading projects…' : 'Select project (required for consumption)'}</option>
                               {projects.map((p) => (
                                 <option key={p._id} value={p._id}>
                                   {p.code} — {p.name}
@@ -557,9 +629,20 @@ const WarehousePanel = () => {
                           </div>
                         )}
 
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Notes</label>
+                          <input
+                            type="text"
+                            placeholder="Optional"
+                            value={movementNotes}
+                            onChange={(e) => setMovementNotes(e.target.value)}
+                            className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                          />
+                        </div>
+
                         <button 
                           type="submit"
-                          disabled={loading || !manualSku || (movementType === 'OUT' && !movementProjectId)}
+                          disabled={loading || !manualSku || (movementType === 'OUT' && movementReason === 'CONSUMPTION' && !movementProjectId)}
                           className={`w-full py-4 rounded-2xl text-white font-black text-lg shadow-lg transform transition-all active:scale-95 flex items-center justify-center space-x-2 ${
                             movementType === 'IN' 
                               ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' 

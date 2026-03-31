@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   History,
   Boxes,
-  Briefcase
+  Briefcase,
+  IndianRupee
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -22,6 +23,7 @@ const Dashboard = () => {
   const isAdmin = user?.role === ROLES.ADMIN;
   const isWarehouse = user?.role === ROLES.WAREHOUSE;
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
+  const isFinance = user?.role === ROLES.FINANCE;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -115,6 +117,21 @@ const Dashboard = () => {
               </div>
               <h3 className="text-lg font-bold text-gray-900">Project Materials</h3>
               <p className="text-sm text-gray-500 mt-1">See allocations, track usage vs planned, and detect overconsumption.</p>
+            </Link>
+          </div>
+        )}
+
+        {isFinance && (
+          <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Link
+              to="/finance"
+              className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all group"
+            >
+              <div className="p-3 bg-emerald-50 rounded-lg w-fit mb-4 group-hover:bg-emerald-100 transition-colors">
+                <IndianRupee className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Finance Analytics</h3>
+              <p className="text-sm text-gray-500 mt-1">Inventory valuation, cost tracking, and loss/wastage analytics.</p>
             </Link>
           </div>
         )}
