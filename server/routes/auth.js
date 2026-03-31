@@ -272,4 +272,99 @@ router.get('/users', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, 
   }
 });
 
+// Update User (Admin Only)
+router.put('/users/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, email, role, password } = req.body || {};
+
+    if (role === ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Cannot assign Admin role' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const updates = {};
+
+    if (username !== undefined) {
+      const existing = await User.findOne({ username, _id: { $ne: id } });
+      if (existing) return res.status(400).json({ message: 'Username already in use' });
+      updates.username = username;
+      user.username = username;
+    }
+
+    if (email !== undefined) {
+      const existing = await User.findOne({ email, _id: { $ne: id } });
+      if (existing) return res.status(400).json({ message: 'Email already in use' });
+      updates.email = email;
+      user.email = email;
+    }
+
+    if (role !== undefined) {
+      updates.role = role;
+      user.role = role;
+    }
+
+    if (password !== undefined && String(password).trim().length > 0) {
+      updates.passwordReset = true;
+      user.password = password;
+    }
+
+    await user.save();
+    const safeUser = await User.findById(id).select('-password');
+
+    await recordAuditLog({
+      req,
+      action: 'USER_UPDATE',
+      entityType: 'User',
+      entityId: id,
+      details: { updates }
+    });
+
+    res.json(safeUser);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update user', error: error.message });
+  }
+});
+
+// Delete User (Admin Only)
+router.delete('/users/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (String(req.user?.id) === String(id)) {
+      return res.status(400).json({ message: 'You cannot delete your own account' });
+    }
+
+    const user = await User.findById(id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.role === ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Cannot delete Admin user' });
+    }
+
+    await User.deleteOne({ _id: id });
+
+    await recordAuditLog({
+      req,
+      action: 'USER_DELETE',
+      entityType: 'User',
+      entityId: id,
+      details: {
+        deletedUser: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete user', error: error.message });
+  }
+});
+
 module.exports = router;
