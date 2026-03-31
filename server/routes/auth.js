@@ -7,15 +7,26 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { ROLES } = require('../constants/roles');
 
-// Register (Admin Only)
-router.post('/register', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+// Register (Public)
+router.post('/register', async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
-    const newUser = new User({ username, email, password, role: role || 'user' });
+    // Restrict registration of Admin role
+    if (role === ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Cannot register as Admin' });
+    }
+
+    const newUser = new User({ 
+      username, 
+      email, 
+      password, 
+      role: role || ROLES.INVENTORY_MANAGER 
+    });
     await newUser.save();
 
     res.status(201).json({ message: 'User registered successfully' });
@@ -35,7 +46,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, username: user.username, email: user.email },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -46,7 +57,8 @@ router.post('/login', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        role: user.role
+        role: user.role,
+        profile: user.profile || {}
       }
     });
   } catch (error) {
@@ -64,8 +76,127 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+const PROFILE_FIELDS = [
+  'firstName',
+  'lastName',
+  'phone',
+  'department',
+  'jobTitle',
+  'addressLine1',
+  'addressLine2',
+  'city',
+  'state',
+  'postalCode',
+  'country',
+  'avatarUrl',
+  'bio'
+];
+
+const pickProfileFields = (body) => {
+  const nextProfile = {};
+  for (const key of PROFILE_FIELDS) {
+    if (body[key] !== undefined) nextProfile[key] = body[key];
+  }
+  return nextProfile;
+};
+
+// Read Profile (Protected)
+router.get('/profile', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      profile: user.profile || {}
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch profile', error: error.message });
+  }
+});
+
+// Create Profile (Protected)
+router.post('/profile', authMiddleware, async (req, res) => {
+  try {
+    if (req.body?.email !== undefined) {
+      return res.status(400).json({ message: 'Email cannot be updated via profile' });
+    }
+    if (req.body?.role !== undefined) {
+      return res.status(400).json({ message: 'Role cannot be updated via profile' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (req.body?.username !== undefined) {
+      const existing = await User.findOne({ username: req.body.username, _id: { $ne: user._id } });
+      if (existing) return res.status(400).json({ message: 'Username already in use' });
+      user.username = req.body.username;
+    }
+
+    const incomingProfile = pickProfileFields(req.body || {});
+    user.profile = { ...(user.profile?.toObject?.() || user.profile || {}), ...incomingProfile };
+    await user.save();
+
+    const safeUser = await User.findById(user._id).select('-password');
+    res.status(201).json(safeUser);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to create profile', error: error.message });
+  }
+});
+
+// Update Profile (Protected)
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    if (req.body?.email !== undefined) {
+      return res.status(400).json({ message: 'Email cannot be updated via profile' });
+    }
+    if (req.body?.role !== undefined) {
+      return res.status(400).json({ message: 'Role cannot be updated via profile' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (req.body?.username !== undefined) {
+      const existing = await User.findOne({ username: req.body.username, _id: { $ne: user._id } });
+      if (existing) return res.status(400).json({ message: 'Username already in use' });
+      user.username = req.body.username;
+    }
+
+    const incomingProfile = pickProfileFields(req.body || {});
+    user.profile = { ...(user.profile?.toObject?.() || user.profile || {}), ...incomingProfile };
+    await user.save();
+
+    const safeUser = await User.findById(user._id).select('-password');
+    res.json(safeUser);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update profile', error: error.message });
+  }
+});
+
+// Delete Profile Data (Protected) - clears profile fields (keeps email, role, username)
+router.delete('/profile', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const cleared = {};
+    for (const key of PROFILE_FIELDS) cleared[key] = '';
+    user.profile = cleared;
+    await user.save();
+
+    const safeUser = await User.findById(user._id).select('-password');
+    res.json(safeUser);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete profile data', error: error.message });
+  }
+});
+
 // Get All Users (Admin Only)
-router.get('/users', authMiddleware, roleMiddleware('admin'), async (req, res) => {
+router.get('/users', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
   try {
     const users = await User.find().select('-password');
     res.json(users);

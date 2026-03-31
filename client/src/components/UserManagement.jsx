@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { UserPlus, User, Mail, Shield, Loader2, Trash2 } from 'lucide-react';
 
+import { ROLES } from '../constants/roles';
+
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +11,7 @@ const UserManagement = () => {
     username: '',
     email: '',
     password: '',
-    role: 'user'
+    role: ROLES.INVENTORY_MANAGER
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -42,7 +44,7 @@ const UserManagement = () => {
     try {
       await api.post('/auth/register', formData);
       setSuccess('User created successfully');
-      setFormData({ username: '', email: '', password: '', role: 'user' });
+      setFormData({ username: '', email: '', password: '', role: ROLES.INVENTORY_MANAGER });
       fetchUsers();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create user');
@@ -107,8 +109,11 @@ const UserManagement = () => {
               onChange={handleChange}
               className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             >
-              <option value="user">User Role</option>
-              <option value="admin">Admin Role</option>
+              {Object.entries(ROLES).map(([key, value]) => (
+                <option key={value} value={value}>
+                  {key.replace(/_/g, ' ').charAt(0).toUpperCase() + key.replace(/_/g, ' ').slice(1).toLowerCase()}
+                </option>
+              ))}
             </select>
           </div>
           
@@ -158,10 +163,10 @@ const UserManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{u.username}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">{u.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        u.role === ROLES.ADMIN ? 'bg-indigo-100 text-indigo-800' : 'bg-emerald-100 text-emerald-800'
                       }`}>
-                        {u.role}
+                        {u.role?.replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-500 text-sm">

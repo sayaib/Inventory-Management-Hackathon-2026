@@ -1,11 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard } from 'lucide-react';
+import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package } from 'lucide-react';
 import UserManagement from '../components/UserManagement';
+import api from '../api/axios';
 
 const AdminPanel = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState({
+    users: 0,
+    inventory: 0,
+    lowStock: 0
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [usersRes, inventoryRes] = await Promise.all([
+          api.get('/auth/users'),
+          api.get('/inventory')
+        ]);
+        setStats({
+          users: Array.isArray(usersRes.data) ? usersRes.data.length : (usersRes.data.users?.length || 0),
+          inventory: inventoryRes.data.totalAssets || 0,
+          lowStock: inventoryRes.data.lowStockCount || 0
+        });
+      } catch (err) {
+        console.error('Failed to fetch stats', err);
+      }
+    };
+    fetchStats();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -75,19 +100,19 @@ const AdminPanel = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                   <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Total Users</div>
-                  <div className="text-3xl font-bold text-gray-900">1,284</div>
+                  <div className="text-3xl font-bold text-gray-900">{stats.users}</div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Active Inventory</div>
-                  <div className="text-3xl font-bold text-gray-900">4,592</div>
+                  <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Inventory Items</div>
+                  <div className="text-3xl font-bold text-gray-900">{stats.inventory}</div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Pending Tasks</div>
-                  <div className="text-3xl font-bold text-gray-900">24</div>
+                  <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Low Stock Alerts</div>
+                  <div className="text-3xl font-bold text-red-600">{stats.lowStock}</div>
                 </div>
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                  <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Revenue (Today)</div>
-                  <div className="text-3xl font-bold text-gray-900">$12,840</div>
+                  <div className="text-gray-400 text-sm font-medium mb-1 uppercase tracking-wider">Total Value</div>
+                  <div className="text-3xl font-bold text-gray-900">₹1,28,400</div>
                 </div>
               </div>
 
