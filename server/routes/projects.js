@@ -871,4 +871,136 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
   }
 });
 
+const normalizeTextOrUndefined = (value) => {
+  if (value === undefined || value === null) return undefined;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const normalizeNumberOrUndefined = (value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return undefined;
+  return parsed;
+};
+
+const normalizeEffectiveDateOrNull = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+};
+
+router.get('/:projectId/bom-change-requests', authMiddleware, attachUserProfileDepartment, canViewProjects, async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canAccessProject(req, project)) return res.status(403).json({ message: 'Access denied. You do not have permission.' });
+    res.json({ projectId: project._id, requests: project.bomChangeRequests || [] });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch BOM change requests', error: error.message });
+  }
+});
+
+router.post('/:projectId/bom-change-requests', authMiddleware, attachUserProfileDepartment, canEditBom, async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canAccessProject(req, project)) return res.status(403).json({ message: 'Access denied. You do not have permission.' });
+
+    const body = req.body || {};
+    const title = normalizeTextOrUndefined(body.title);
+    const reason = normalizeTextOrUndefined(body.reason);
+    const notes = normalizeTextOrUndefined(body.notes) || '';
+    const priority = ['low', 'medium', 'high'].includes(String(body.priority)) ? String(body.priority) : 'medium';
+    const effectiveDate = normalizeEffectiveDateOrNull(body.effectiveDate);
+    const bomItemIdRaw = normalizeTextOrUndefined(body.bomItemId || body.bomItem || body.bomItemID);
+
+    if (!title || !reason) {
+      return res.status(400).json({ message: 'title and reason are required' });
+    }
+
+    const bomItem = bomItemIdRaw ? project.bomItems?.id?.(bomItemIdRaw) : null;
+    const currentBomItem = bomItem ? (bomItem.toObject ? bomItem.toObject() : { ...bomItem }) : null;
+
+    const incomingProposed = body.proposedChanges && typeof body.proposedChanges === 'object' ? body.proposedChanges : {};
+    const proposedChanges = {};
+
+    const stringFields = [
+      'typeOfComponent',
+      'supplierName',
+      'nomenclatureDescription',
+      'partNoDrg',
+      'make',
+      'remarks',
+      'leadTime',
+      'inventoryAssetId',
+      'inventorySku',
+      'inventoryItemName'
+    ];
+    for (const key of stringFields) {
+      const val = normalizeTextOrUndefined(incomingProposed[key]);
+      if (val !== undefined) proposedChanges[key] = val;
+    }
+
+    const numberFields = [
+      'srNo',
+      'qtyPerBoard',
+      'boardReq',
+      'spareQty',
+      'unitCost',
+      'additionalCost',
+      'moq',
+      'leadTimeWeeks',
+      'plannedQty'
+    ];
+    for (const key of numberFields) {
+      const val = normalizeNumberOrUndefined(incomingProposed[key]);
+      if (val !== undefined) proposedChanges[key] = val;
+    }
+
+    const requestDoc = {
+      title,
+      priority,
+      status: 'submitted',
+      reason,
+      effectiveDate,
+      bomItemId: bomItem ? bomItem._id : null,
+      currentBomItem,
+      proposedChanges,
+      notes,
+      requestedBy: {
+        userId: req.user.id,
+        username: req.user.username || '',
+        email: req.user.email || ''
+      }
+    };
+
+    project.bomChangeRequests = project.bomChangeRequests || [];
+    project.bomChangeRequests.push(requestDoc);
+    await project.save();
+
+    const saved = project.bomChangeRequests[project.bomChangeRequests.length - 1];
+
+    await recordAuditLog({
+      req,
+      action: 'PROJECT_BOM_CHANGE_REQUEST_CREATE',
+      entityType: 'Project',
+      entityId: project._id,
+      details: {
+        projectCode: project.code,
+        projectName: project.name,
+        requestId: String(saved?._id || ''),
+        title,
+        priority,
+        bomItemId: bomItem ? String(bomItem._id) : null
+      }
+    });
+
+    res.status(201).json({ projectId: project._id, request: saved });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to create BOM change request', error: error.message });
+  }
+});
+
 module.exports = router;

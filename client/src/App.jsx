@@ -16,6 +16,7 @@ import FinancePanel from './pages/FinancePanel';
 import BomDashboard from './pages/BomDashboard';
 import AddBom from './pages/AddBom';
 import SubmittedBom from './pages/SubmittedBom';
+import BomChangeRequest from './pages/BomChangeRequest';
 
 function App() {
   return (
@@ -34,6 +35,10 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/bom" element={<BomDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]} />}>
+            <Route path="/projects/bom-change-request" element={<BomChangeRequest />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.PRESALE]} />}>

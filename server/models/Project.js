@@ -48,6 +48,23 @@ const bomItemSchema = new mongoose.Schema({
   plannedQty: { type: Number, default: 0, min: 0 }
 }, { timestamps: true });
 
+const bomChangeRequestSchema = new mongoose.Schema({
+  title: { type: String, required: true, trim: true },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  status: { type: String, enum: ['submitted', 'approved', 'rejected'], default: 'submitted' },
+  reason: { type: String, required: true, trim: true },
+  effectiveDate: { type: Date, default: null },
+  bomItemId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  currentBomItem: { type: mongoose.Schema.Types.Mixed, default: null },
+  proposedChanges: { type: mongoose.Schema.Types.Mixed, default: {} },
+  notes: { type: String, default: '', trim: true },
+  requestedBy: {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    username: { type: String, default: '', trim: true },
+    email: { type: String, default: '', trim: true, lowercase: true }
+  }
+}, { timestamps: true });
+
 const projectSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, trim: true },
   name: { type: String, required: true, trim: true },
@@ -57,7 +74,8 @@ const projectSchema = new mongoose.Schema({
   managerUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   managerEmail: { type: String, default: '', trim: true, lowercase: true },
   materials: { type: [projectMaterialSchema], default: [] },
-  bomItems: { type: [bomItemSchema], default: [] }
+  bomItems: { type: [bomItemSchema], default: [] },
+  bomChangeRequests: { type: [bomChangeRequestSchema], default: [] }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Project', projectSchema);

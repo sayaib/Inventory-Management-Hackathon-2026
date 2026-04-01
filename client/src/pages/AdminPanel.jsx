@@ -38,6 +38,28 @@ const AdminPanel = () => {
   const [projectStatusDept, setProjectStatusDept] = useState('all');
   const [reportDept, setReportDept] = useState('all');
   const [reportSearch, setReportSearch] = useState('');
+  const [lowStockRows, setLowStockRows] = useState([]);
+  const [lowStockLoading, setLowStockLoading] = useState(false);
+  const [lowStockError, setLowStockError] = useState('');
+  const [lowStockPage, setLowStockPage] = useState(1);
+  const [lowStockTotalPages, setLowStockTotalPages] = useState(1);
+  const [lowStockDept, setLowStockDept] = useState('all');
+  const [lowStockSearch, setLowStockSearch] = useState('');
+  const [valuationRows, setValuationRows] = useState([]);
+  const [valuationLoading, setValuationLoading] = useState(false);
+  const [valuationError, setValuationError] = useState('');
+  const [valuationPage, setValuationPage] = useState(1);
+  const [valuationTotalPages, setValuationTotalPages] = useState(1);
+  const [valuationDept, setValuationDept] = useState('all');
+  const [valuationSearch, setValuationSearch] = useState('');
+  const [valuationTotalValue, setValuationTotalValue] = useState(0);
+  const [reportLogRows, setReportLogRows] = useState([]);
+  const [reportLogLoading, setReportLogLoading] = useState(false);
+  const [reportLogError, setReportLogError] = useState('');
+  const [reportLogPage, setReportLogPage] = useState(1);
+  const [reportLogTotalPages, setReportLogTotalPages] = useState(1);
+  const [reportLogType, setReportLogType] = useState('ALL');
+  const [reportLogSearch, setReportLogSearch] = useState('');
 
   useEffect(() => {
     const el = purchasesRef.current;
@@ -175,6 +197,86 @@ const AdminPanel = () => {
     if (activeTab !== 'projectStatus' && activeTab !== 'reports') return;
     fetchProjectStatuses();
   }, [activeTab]);
+  
+  const fetchLowStock = async () => {
+    setLowStockLoading(true);
+    setLowStockError('');
+    try {
+      const params = new URLSearchParams();
+      params.set('lowStock', 'true');
+      params.set('limit', '20');
+      params.set('page', String(lowStockPage));
+      if (lowStockDept !== 'all') params.set('department', lowStockDept);
+      if (lowStockSearch.trim()) params.set('search', lowStockSearch.trim());
+      const res = await api.get(`/inventory?${params.toString()}`);
+      const rows = Array.isArray(res.data?.assets) ? res.data.assets : [];
+      setLowStockRows(rows);
+      setLowStockTotalPages(Number(res.data?.totalPages || 1));
+    } catch (err) {
+      setLowStockError(err.response?.data?.message || 'Failed to fetch low stock');
+    } finally {
+      setLowStockLoading(false);
+    }
+  };
+  
+  const fetchValuation = async () => {
+    setValuationLoading(true);
+    setValuationError('');
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '20');
+      params.set('page', String(valuationPage));
+      if (valuationDept !== 'all') params.set('department', valuationDept);
+      if (valuationSearch.trim()) params.set('search', valuationSearch.trim());
+      const res = await api.get(`/inventory/finance/valuation?${params.toString()}`);
+      const rows = Array.isArray(res.data?.items) ? res.data.items : [];
+      setValuationRows(rows);
+      setValuationTotalPages(Number(res.data?.totalPages || 1));
+      setValuationTotalValue(Number(res.data?.totalInventoryValue || 0));
+    } catch (err) {
+      setValuationError(err.response?.data?.message || 'Failed to fetch valuation');
+    } finally {
+      setValuationLoading(false);
+    }
+  };
+  
+  const fetchReportLogs = async () => {
+    setReportLogLoading(true);
+    setReportLogError('');
+    try {
+      const params = new URLSearchParams();
+      params.set('limit', '20');
+      params.set('page', String(reportLogPage));
+      if (reportLogType !== 'ALL') params.set('type', reportLogType);
+      if (reportLogSearch.trim()) params.set('search', reportLogSearch.trim());
+      const res = await api.get(`/inventory/logs?${params.toString()}`);
+      const rows = Array.isArray(res.data?.logs) ? res.data.logs : [];
+      setReportLogRows(rows);
+      setReportLogTotalPages(Number(res.data?.totalPages || 1));
+    } catch (err) {
+      setReportLogError(err.response?.data?.message || 'Failed to fetch logs');
+    } finally {
+      setReportLogLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (activeTab !== 'reports') return;
+    fetchLowStock();
+    fetchValuation();
+    fetchReportLogs();
+  }, [
+    activeTab,
+    lowStockPage,
+    lowStockDept,
+    lowStockSearch,
+    valuationPage,
+    valuationDept,
+    valuationSearch,
+    reportLogPage,
+    reportLogType,
+    reportLogSearch
+  ]);
 
   const formatDateTime = (value) => {
     if (!value) return '-';
@@ -926,6 +1028,143 @@ const AdminPanel = () => {
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Low stock items</h2>
+                      <p className="text-xs text-slate-500">Items at or below threshold</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        value={lowStockSearch}
+                        onChange={(e) => {
+                          setLowStockSearch(e.target.value);
+                          setLowStockPage(1);
+                        }}
+                        placeholder="Search by name/asset/sku…"
+                        className="h-9 w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      />
+                      <select
+                        value={lowStockDept}
+                        onChange={(e) => {
+                          setLowStockDept(e.target.value);
+                          setLowStockPage(1);
+                        }}
+                        className="h-9 w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      >
+                        <option value="all">All departments</option>
+                        {reportDepartments.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchLowStock();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (lowStockRows || []).map((a) => ({
+                            Department: a?.department || '',
+                            AssetId: a?.assetId || '',
+                            SKU: a?.sku || '',
+                            Name: a?.itemName || '',
+                            TotalQty: Number(a?.totalQuantity || 0),
+                            AllocatedQty: Number(a?.allocatedQuantity || 0),
+                            AvailableQty: Number(a?.availableQuantity || 0),
+                            Threshold: Number(a?.lowStockThreshold ?? 5)
+                          }));
+                          downloadCsv(`low_stock_${lowStockDept === 'all' ? 'all' : lowStockDept}.csv`, rows);
+                        }}
+                        className="h-9 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700"
+                      >
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </button>
+                    </div>
+                  </div>
+                  {lowStockError && (
+                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                      {lowStockError}
+                    </div>
+                  )}
+                  <div className="mt-3 w-full overflow-auto">
+                    <table className="min-w-[1100px] w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-[11px] font-extrabold text-slate-700">
+                          <th className="px-4 py-3">Asset</th>
+                          <th className="px-4 py-3">Department</th>
+                          <th className="px-4 py-3">Total</th>
+                          <th className="px-4 py-3">Allocated</th>
+                          <th className="px-4 py-3">Available</th>
+                          <th className="px-4 py-3">Threshold</th>
+                          <th className="px-4 py-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {lowStockLoading ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={7}>Loading…</td>
+                          </tr>
+                        ) : (lowStockRows || []).length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={7}>No low stock items.</td>
+                          </tr>
+                        ) : (
+                          (lowStockRows || []).map((a) => {
+                            const threshold = Number(a?.lowStockThreshold ?? 5);
+                            const avail = Number(a?.availableQuantity || 0);
+                            const isCritical = avail <= threshold;
+                            return (
+                              <tr key={a?._id || a?.assetId} className="hover:bg-slate-50/70">
+                                <td className="px-4 py-3">
+                                  <div className="font-extrabold text-slate-900">{a?.itemName || '-'}</div>
+                                  <div className="text-[11px] font-semibold text-slate-600">{a?.assetId || ''} {a?.sku ? `• ${a.sku}` : ''}</div>
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-extrabold text-slate-700">{normalizeDepartment(a?.department)}</td>
+                                <td className="px-4 py-3 font-bold text-slate-700">{Number(a?.totalQuantity || 0)}</td>
+                                <td className="px-4 py-3 font-bold text-slate-700">{Number(a?.allocatedQuantity || 0)}</td>
+                                <td className="px-4 py-3 font-bold text-slate-700">{avail}</td>
+                                <td className="px-4 py-3 font-bold text-slate-700">{threshold}</td>
+                                <td className="px-4 py-3">
+                                  <span className={['inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold', isCritical ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'].join(' ')}>
+                                    {isCritical ? 'Attention' : 'OK'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-slate-500">Page {lowStockPage} / {lowStockTotalPages}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={lowStockPage <= 1}
+                        onClick={() => setLowStockPage((p) => Math.max(1, p - 1))}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-700 disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        disabled={lowStockPage >= lowStockTotalPages}
+                        onClick={() => setLowStockPage((p) => p + 1)}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-700 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
                       <h2 className="text-sm font-extrabold text-slate-900">Department-wise project inventory report</h2>
                       <p className="text-xs text-slate-500">Projects utilization + current stock snapshot grouped by department.</p>
                     </div>
@@ -986,7 +1225,276 @@ const AdminPanel = () => {
                     {projectStatusError}
                   </div>
                 )}
-
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Inventory valuation</h2>
+                      <p className="text-xs text-slate-500">Per-item average cost and total value</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        value={valuationSearch}
+                        onChange={(e) => {
+                          setValuationSearch(e.target.value);
+                          setValuationPage(1);
+                        }}
+                        placeholder="Search by name/asset/sku…"
+                        className="h-9 w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      />
+                      <select
+                        value={valuationDept}
+                        onChange={(e) => {
+                          setValuationDept(e.target.value);
+                          setValuationPage(1);
+                        }}
+                        className="h-9 w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      >
+                        <option value="all">All departments</option>
+                        {reportDepartments.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchValuation();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (valuationRows || []).map((i) => ({
+                            Department: i?.department || '',
+                            AssetId: i?.assetId || '',
+                            SKU: i?.sku || '',
+                            Name: i?.itemName || '',
+                            TotalQty: Number(i?.totalQuantity || 0),
+                            Unit: i?.unit || '',
+                            AvgUnitCost: Math.round((Number(i?.avgUnitCost || 0) + Number.EPSILON) * 100) / 100,
+                            TotalValue: Math.round((Number(i?.totalValue || 0) + Number.EPSILON) * 100) / 100
+                          }));
+                          downloadCsv(`inventory_valuation_${valuationDept === 'all' ? 'all' : valuationDept}.csv`, rows);
+                        }}
+                        className="h-9 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700"
+                      >
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </button>
+                    </div>
+                  </div>
+                  {valuationError && (
+                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                      {valuationError}
+                    </div>
+                  )}
+                  <div className="mt-3 border-b border-slate-200 px-4 py-2 text-[11px] font-bold text-slate-700">
+                    Total snapshot value: {formatRupees(valuationTotalValue)}
+                  </div>
+                  <div className="w-full overflow-auto">
+                    <table className="min-w-[1100px] w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-[11px] font-extrabold text-slate-700">
+                          <th className="px-4 py-3">Asset</th>
+                          <th className="px-4 py-3">Department</th>
+                          <th className="px-4 py-3">Qty</th>
+                          <th className="px-4 py-3">Unit</th>
+                          <th className="px-4 py-3">Avg unit cost</th>
+                          <th className="px-4 py-3">Total value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {valuationLoading ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={6}>Loading…</td>
+                          </tr>
+                        ) : (valuationRows || []).length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={6}>No valuation items.</td>
+                          </tr>
+                        ) : (
+                          (valuationRows || []).map((i) => (
+                            <tr key={i?.assetId || i?.sku} className="hover:bg-slate-50/70">
+                              <td className="px-4 py-3">
+                                <div className="font-extrabold text-slate-900">{i?.itemName || '-'}</div>
+                                <div className="text-[11px] font-semibold text-slate-600">{i?.assetId || ''} {i?.sku ? `• ${i.sku}` : ''}</div>
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-extrabold text-slate-700">{normalizeDepartment(i?.department)}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{Number(i?.totalQuantity || 0)}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{i?.unit || ''}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{formatRupees(Number(i?.avgUnitCost || 0))}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{formatRupees(Number(i?.totalValue || 0))}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-slate-500">Page {valuationPage} / {valuationTotalPages}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={valuationPage <= 1}
+                        onClick={() => setValuationPage((p) => Math.max(1, p - 1))}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-700 disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        disabled={valuationPage >= valuationTotalPages}
+                        onClick={() => setValuationPage((p) => p + 1)}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-700 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Stock movement logs</h2>
+                      <p className="text-xs text-slate-500">IN/OUT history with cost</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        value={reportLogSearch}
+                        onChange={(e) => {
+                          setReportLogSearch(e.target.value);
+                          setReportLogPage(1);
+                        }}
+                        placeholder="Search by name/asset/sku/project…"
+                        className="h-9 w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      />
+                      <select
+                        value={reportLogType}
+                        onChange={(e) => {
+                          setReportLogType(e.target.value);
+                          setReportLogPage(1);
+                        }}
+                        className="h-9 w-full sm:w-40 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      >
+                        <option value="ALL">All</option>
+                        <option value="IN">IN</option>
+                        <option value="OUT">OUT</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchReportLogs();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (reportLogRows || []).map((l) => ({
+                            Type: l?.type || '',
+                            Reason: l?.reason || '',
+                            Department: l?.department || '',
+                            AssetId: l?.assetId || '',
+                            SKU: l?.sku || '',
+                            Name: l?.itemName || '',
+                            Project: l?.projectName || '',
+                            Quantity: Number(l?.quantity || 0),
+                            UnitCost: Math.round((Number(l?.unitCost || 0) + Number.EPSILON) * 100) / 100,
+                            TotalCost: Math.round((Number(l?.totalCost || 0) + Number.EPSILON) * 100) / 100,
+                            PerformedBy: l?.performedBy || '',
+                            Timestamp: l?.timestamp ? new Date(l.timestamp).toLocaleString() : ''
+                          }));
+                          downloadCsv(`stock_logs_${reportLogType.toLowerCase()}.csv`, rows);
+                        }}
+                        className="h-9 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700"
+                      >
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </button>
+                    </div>
+                  </div>
+                  {reportLogError && (
+                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                      {reportLogError}
+                    </div>
+                  )}
+                  <div className="w-full overflow-auto mt-3">
+                    <table className="min-w-[1200px] w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-[11px] font-extrabold text-slate-700">
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Department</th>
+                          <th className="px-4 py-3">Asset</th>
+                          <th className="px-4 py-3">Project</th>
+                          <th className="px-4 py-3">Qty</th>
+                          <th className="px-4 py-3">Unit cost</th>
+                          <th className="px-4 py-3">Total cost</th>
+                          <th className="px-4 py-3">By</th>
+                          <th className="px-4 py-3">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {reportLogLoading ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={9}>Loading…</td>
+                          </tr>
+                        ) : (reportLogRows || []).length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={9}>No logs found.</td>
+                          </tr>
+                        ) : (
+                          (reportLogRows || []).map((l, idx) => (
+                            <tr key={`${l?._id || ''}-${idx}`} className="hover:bg-slate-50/70">
+                              <td className="px-4 py-3">
+                                <span className={['inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold', l?.type === 'IN' ? 'bg-primary/10 text-primary-700 border border-primary/20' : 'bg-rose-50 text-rose-700 border border-rose-200'].join(' ')}>
+                                  {l?.type || ''}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-extrabold text-slate-700">{normalizeDepartment(l?.department)}</td>
+                              <td className="px-4 py-3">
+                                <div className="font-extrabold text-slate-900">{l?.itemName || '-'}</div>
+                                <div className="text-[11px] font-semibold text-slate-600">{l?.assetId || ''} {l?.sku ? `• ${l.sku}` : ''}</div>
+                              </td>
+                              <td className="px-4 py-3 text-[11px] font-bold text-slate-700">{l?.projectName || ''}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{Number(l?.quantity || 0)}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{formatRupees(Number(l?.unitCost || 0))}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{formatRupees(Number(l?.totalCost || 0))}</td>
+                              <td className="px-4 py-3 text-[11px] font-bold text-slate-700">{l?.performedBy || ''}</td>
+                              <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">{l?.timestamp ? new Date(l.timestamp).toLocaleString() : ''}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-slate-500">Page {reportLogPage} / {reportLogTotalPages}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={reportLogPage <= 1}
+                        onClick={() => setReportLogPage((p) => Math.max(1, p - 1))}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-700 disabled:opacity-50"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reportLogPage >= reportLogTotalPages}
+                        onClick={() => setReportLogPage((p) => p + 1)}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-extrabold text-slate-700 disabled:opacity-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                   <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
                     <div className="text-xs font-extrabold text-slate-700">Department summary</div>

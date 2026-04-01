@@ -323,6 +323,15 @@ const Dashboard = () => {
                     </div>
                   ))}
                 </div>
+                {(isProjectManager || isSalesHead) && (
+                  <Link
+                    to="/projects/bom-change-request"
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary text-white px-4 py-2 text-sm font-extrabold hover:bg-primary-700 transition-all"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    {isProjectManager ? 'Raise BOM Change Request' : 'View BOM Change Requests'}
+                  </Link>
+                )}
               </div>
             </div>
           </section>

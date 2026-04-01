@@ -31,7 +31,8 @@ export const FEATURES = {
   [ROLES.PROJECT_MANAGER]: [
     'See allocated materials per project',
     'Track usage vs planned',
-    'Detect overconsumption'
+    'Detect overconsumption',
+    'Raise BOM change requests'
   ],
   [ROLES.SALES_HEAD]: [
     'Create projects (IWO-based)',
