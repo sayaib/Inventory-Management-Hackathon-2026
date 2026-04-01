@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download } from 'lucide-react';
 import UserManagement from '../components/UserManagement';
 import AuditLog from '../components/AuditLog';
 import AdminProfile from '../components/AdminProfile';
 import api from '../api/axios';
+import { ASSET_LOCATIONS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -64,6 +65,57 @@ const AdminPanel = () => {
   const [reportLogTotalPages, setReportLogTotalPages] = useState(1);
   const [reportLogType, setReportLogType] = useState('ALL');
   const [reportLogSearch, setReportLogSearch] = useState('');
+  const [predictionProjects, setPredictionProjects] = useState([]);
+  const [predictionLoading, setPredictionLoading] = useState(false);
+  const [predictionError, setPredictionError] = useState('');
+  const [predictionProjectId, setPredictionProjectId] = useState('');
+  const [predictionRows, setPredictionRows] = useState([]);
+  const [predictionGeneratedAt, setPredictionGeneratedAt] = useState('');
+  const [predictionUploadMeta, setPredictionUploadMeta] = useState({ fileName: '', rows: 0 });
+  const [assetLocation, setAssetLocation] = useState(() => {
+    return localStorage.getItem('admin_asset_location') || localStorage.getItem('admin_company_location') || 'warehouse';
+  });
+  const [companyDirectory, setCompanyDirectory] = useState(() => {
+    const fallback = [
+      { id: 'optimized_solutions', name: 'Optimized Solutions', locations: ['Pune', 'Mumbai', 'Delhi'] },
+      { id: 'electrotech', name: 'Electrotech', locations: ['Bangalore', 'Hyderabad', 'Chennai'] }
+    ];
+    try {
+      const raw = localStorage.getItem('admin_company_directory_v1');
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => localStorage.getItem('admin_selected_company_id') || 'optimized_solutions');
+  const [selectedCompanyLocation, setSelectedCompanyLocation] = useState(() => localStorage.getItem('admin_selected_company_location') || '');
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [newLocationName, setNewLocationName] = useState('');
+  const [defaultLowStockThreshold, setDefaultLowStockThreshold] = useState(() => {
+    const raw = localStorage.getItem('admin_default_low_stock_threshold');
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 5;
+  });
+  const [companySettingsSaving, setCompanySettingsSaving] = useState(false);
+  const [companySettingsSuccess, setCompanySettingsSuccess] = useState('');
+  const [companySettingsError, setCompanySettingsError] = useState('');
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ mode: '', done: 0, total: 0 });
+
+  useEffect(() => {
+    const company = (companyDirectory || []).find((c) => String(c?.id) === String(selectedCompanyId));
+    if (!company) {
+      const nextId = String(companyDirectory?.[0]?.id || '');
+      if (nextId) setSelectedCompanyId(nextId);
+      return;
+    }
+    const locations = Array.isArray(company?.locations) ? company.locations : [];
+    if (!selectedCompanyLocation || !locations.includes(selectedCompanyLocation)) {
+      setSelectedCompanyLocation(locations[0] || '');
+    }
+  }, [companyDirectory, selectedCompanyId, selectedCompanyLocation]);
 
   useEffect(() => {
     const el = purchasesRef.current;
@@ -79,12 +131,11 @@ const AdminPanel = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [usersRes, inventoryRes, inventoryListRes, logsInRes, logsOutRes, valuationRes] = await Promise.all([
+        const [usersRes, inventoryRes, inventoryListRes, movementTrendRes, valuationRes] = await Promise.all([
           api.get('/auth/users'),
           api.get('/inventory'),
           api.get(`/inventory?limit=500&page=1&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
-          api.get('/inventory/logs?type=IN&limit=500&page=1'),
-          api.get('/inventory/logs?type=OUT&limit=500&page=1'),
+          api.get('/inventory/logs/trend', { params: { startDate, endDate } }),
           api.get('/inventory/finance/valuation?limit=500&page=1')
         ]);
         setStats({
@@ -112,27 +163,8 @@ const AdminPanel = () => {
         }
         const deptQtyArr = Object.entries(deptMap).map(([department, qty]) => ({ department, qty })).sort((a, b) => b.qty - a.qty);
         setDeptQty(deptQtyArr);
-        const from = new Date(startDate);
-        const to = new Date(endDate);
-        to.setHours(23, 59, 59, 999);
-        const inLogs = Array.isArray(logsInRes.data?.logs) ? logsInRes.data.logs : [];
-        const outLogs = Array.isArray(logsOutRes.data?.logs) ? logsOutRes.data.logs : [];
-        const inMap = {};
-        const outMap = {};
-        for (const l of inLogs) {
-          const t = l?.timestamp ? new Date(l.timestamp) : null;
-          if (!t || t < from || t > to) continue;
-          const k = t.toISOString().slice(0, 10);
-          inMap[k] = (inMap[k] || 0) + 1;
-        }
-        for (const l of outLogs) {
-          const t = l?.timestamp ? new Date(l.timestamp) : null;
-          if (!t || t < from || t > to) continue;
-          const k = t.toISOString().slice(0, 10);
-          outMap[k] = (outMap[k] || 0) + 1;
-        }
-        const allDates = Array.from(new Set([...Object.keys(inMap), ...Object.keys(outMap)])).sort();
-        setMovementTrend(allDates.map((d) => ({ date: d, inCount: inMap[d] || 0, outCount: outMap[d] || 0 })));
+        const trend = Array.isArray(movementTrendRes.data?.trend) ? movementTrendRes.data.trend : [];
+        setMovementTrend(trend);
         const items = Array.isArray(valuationRes.data?.items) ? valuationRes.data.items : [];
         const valMap = {};
         for (const it of items) {
@@ -183,6 +215,150 @@ const AdminPanel = () => {
     URL.revokeObjectURL(url);
   };
 
+  const hashTo01 = (value) => {
+    const s = String(value || '');
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const n = (h >>> 0) % 10000;
+    return n / 10000;
+  };
+
+  const parseCsvText = (text) => {
+    const raw = String(text || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trimEnd())
+      .filter((l) => l.trim().length > 0);
+    if (lines.length === 0) return [];
+
+    const parseLine = (line) => {
+      const out = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            const next = line[i + 1];
+            if (next === '"') {
+              cur += '"';
+              i += 1;
+            } else {
+              inQuotes = false;
+            }
+          } else {
+            cur += ch;
+          }
+        } else if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ',') {
+          out.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur);
+      return out.map((c) => c.trim());
+    };
+
+    const headerCells = parseLine(lines[0]);
+    const headers = headerCells.map((h, idx) => (h ? h : `col_${idx + 1}`));
+    const rows = [];
+    for (let i = 1; i < lines.length; i += 1) {
+      const cells = parseLine(lines[i]);
+      const obj = {};
+      for (let c = 0; c < headers.length; c += 1) obj[headers[c]] = cells[c] ?? '';
+      rows.push(obj);
+    }
+    return rows;
+  };
+
+  const buildPredictionsFromBomItems = (bomItems, sourceLabel) => {
+    const safe = Array.isArray(bomItems) ? bomItems : [];
+    const grouped = new Map();
+
+    for (const it of safe) {
+      const name =
+        String(
+          it?.nomenclatureDescription ||
+            it?.itemName ||
+            it?.name ||
+            it?.partNoDrg ||
+            it?.sku ||
+            it?.typeOfComponent ||
+            ''
+        ).trim() || 'Unnamed item';
+
+      const totalQtyWithSpare = Number(it?.totalQtyWithSpare);
+      const qtyPerBoard = Number(it?.qtyPerBoard);
+      const boardReq = Number(it?.boardReq);
+      const spareQty = Number(it?.spareQty);
+      const qtyRaw = Number(it?.qty || it?.quantity || it?.totalQty || it?.totalQuantity);
+
+      const computedQty =
+        Number.isFinite(totalQtyWithSpare) && totalQtyWithSpare > 0
+          ? totalQtyWithSpare
+          : Number.isFinite(qtyRaw) && qtyRaw > 0
+            ? qtyRaw
+            : Number.isFinite(qtyPerBoard) && Number.isFinite(boardReq)
+              ? Math.max(0, qtyPerBoard) * Math.max(0, boardReq) + (Number.isFinite(spareQty) ? Math.max(0, spareQty) : 0)
+              : 1;
+
+      const prev = grouped.get(name) || 0;
+      grouped.set(name, prev + (Number.isFinite(computedQty) ? computedQty : 1));
+    }
+
+    const rows = Array.from(grouped.entries()).map(([itemName, requiredQty]) => {
+      const required = Math.max(0, Math.round((Number(requiredQty) + Number.EPSILON) * 100) / 100);
+      const r1 = hashTo01(`${sourceLabel || ''}:${itemName}:stock`);
+      const r2 = hashTo01(`${sourceLabel || ''}:${itemName}:demand`);
+      const currentStock = Math.max(0, Math.round(required * (0.25 + r1 * 1.05)));
+      const safetyStock = Math.max(0, Math.ceil(required * (0.2 + r2 * 0.15)));
+      const predictedDemand30d = Math.max(0, Math.round(required * (0.8 + r2 * 0.6)));
+      const recommendedPurchase = Math.max(0, Math.ceil(required + safetyStock - currentStock));
+      const status = currentStock >= required ? 'OK' : currentStock + recommendedPurchase >= required ? 'Reorder' : 'Critical';
+
+      return {
+        itemName,
+        required,
+        currentStock,
+        safetyStock,
+        predictedDemand30d,
+        recommendedPurchase,
+        status
+      };
+    });
+
+    rows.sort((a, b) => b.recommendedPurchase - a.recommendedPurchase);
+    setPredictionRows(rows);
+    setPredictionGeneratedAt(new Date().toISOString());
+  };
+
+  const fetchPredictionProjects = useCallback(async () => {
+    setPredictionLoading(true);
+    setPredictionError('');
+    try {
+      const res = await api.get('/projects');
+      const list = Array.isArray(res.data?.projects) ? res.data.projects : [];
+      const withBom = list.filter((p) => (p?.bomItems || []).length > 0);
+      withBom.sort((a, b) => String(a?.code || '').localeCompare(String(b?.code || '')));
+      setPredictionProjects(withBom);
+      if (withBom.length > 0) {
+        setPredictionProjectId((prev) => prev || String(withBom[0]?._id || ''));
+      }
+    } catch (err) {
+      setPredictionError(err.response?.data?.message || 'Failed to fetch projects');
+    } finally {
+      setPredictionLoading(false);
+    }
+  }, []);
+
   const fetchProjectStatuses = async () => {
     setProjectStatusLoading(true);
     setProjectStatusError('');
@@ -201,6 +377,25 @@ const AdminPanel = () => {
     if (activeTab !== 'projectStatus' && activeTab !== 'reports') return;
     fetchProjectStatuses();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'prediction') return;
+    fetchPredictionProjects();
+  }, [activeTab, fetchPredictionProjects]);
+
+  const fetchAllAssets = async () => {
+    const all = [];
+    let page = 1;
+    let totalPages = 1;
+    while (page <= totalPages) {
+      const res = await api.get(`/inventory?limit=200&page=${page}`);
+      const assets = Array.isArray(res.data?.assets) ? res.data.assets : [];
+      all.push(...assets);
+      totalPages = Number(res.data?.totalPages || 1);
+      page += 1;
+    }
+    return all;
+  };
   
   const fetchLowStock = async () => {
     setLowStockLoading(true);
@@ -292,11 +487,12 @@ const AdminPanel = () => {
   const navItems = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'projectStatus', label: 'Project Status', icon: FolderKanban },
+    { key: 'prediction', label: 'Prediction', icon: BarChart3 },
     { key: 'users', label: 'Users', icon: Users },
     { key: 'profile', label: 'Profile', icon: UserIcon },
     { key: 'audit', label: 'Audit Logs', icon: History },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
-    { key: 'settings', label: 'Settings', icon: Settings, disabled: true }
+    { key: 'settings', label: 'Company', icon: Settings }
   ];
 
   const deptQtyMap = (() => {
@@ -400,7 +596,19 @@ const AdminPanel = () => {
     { name: 'Router AX', department: 'IT', status: 'In Progress', allocated: false, procured: true, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
     { name: 'Bearing 6203', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 75, utilDen: 100, utilPct: 75, lastActivityAt: new Date().toISOString() },
     { name: 'LED Panel', department: 'DTMA', status: 'Completed', allocated: true, procured: true, utilUsed: 20, utilDen: 25, utilPct: 80, lastActivityAt: new Date().toISOString() },
-    { name: 'Cable Tray', department: 'PES', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null }
+    { name: 'Cable Tray', department: 'PES', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
+    { name: 'Aluminium Sheet 2mm', department: 'PES', status: 'In Progress', allocated: true, procured: false, utilUsed: 0, utilDen: 60, utilPct: 0, lastActivityAt: null },
+    { name: 'Hydraulic Oil 20L', department: 'ATE', status: 'In Progress', allocated: true, procured: true, utilUsed: 0, utilDen: 15, utilPct: 0, lastActivityAt: null },
+    { name: 'PLC Controller Unit', department: 'ATE', status: 'Completed', allocated: true, procured: true, utilUsed: 4, utilDen: 4, utilPct: 100, lastActivityAt: new Date().toISOString() },
+    { name: 'Industrial Proximity Sensor', department: 'IoT', status: 'In Progress', allocated: true, procured: false, utilUsed: 6, utilDen: 20, utilPct: 30, lastActivityAt: new Date().toISOString() },
+    { name: 'RJ45 Patch Cable 2m', department: 'IT', status: 'Completed', allocated: true, procured: true, utilUsed: 60, utilDen: 80, utilPct: 75, lastActivityAt: new Date().toISOString() },
+    { name: 'UPS Battery Pack', department: 'IT', status: 'In Progress', allocated: true, procured: true, utilUsed: 1, utilDen: 4, utilPct: 25, lastActivityAt: new Date().toISOString() },
+    { name: 'CNC Cutting Tool Set', department: 'PES', status: 'Completed', allocated: true, procured: true, utilUsed: 10, utilDen: 12, utilPct: 83, lastActivityAt: new Date().toISOString() },
+    { name: 'Thermal Camera Module', department: 'DTMA', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 6, utilPct: 0, lastActivityAt: null },
+    { name: 'Fiber Media Converter', department: 'IT', status: 'Completed', allocated: true, procured: true, utilUsed: 2, utilDen: 2, utilPct: 100, lastActivityAt: new Date().toISOString() },
+    { name: 'Arduino Mega 2560', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 12, utilDen: 15, utilPct: 80, lastActivityAt: new Date().toISOString() },
+    { name: 'Projector Lamp', department: 'DTMA', status: 'In Progress', allocated: true, procured: false, utilUsed: 0, utilDen: 3, utilPct: 0, lastActivityAt: null },
+    { name: 'Toolbox Set', department: 'PES', status: 'Completed', allocated: true, procured: true, utilUsed: 8, utilDen: 10, utilPct: 80, lastActivityAt: new Date().toISOString() }
   ];
  
    const dummyInventoryStatusResolved = dummyInventoryStatus.map((r) => ({
@@ -483,7 +691,19 @@ const AdminPanel = () => {
             <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
               <div className="min-w-0">
                 <h1 className="truncate text-base font-extrabold text-slate-900">
-                  {activeTab === 'users' ? 'User Management' : activeTab === 'profile' ? 'Your Profile' : activeTab === 'audit' ? 'Audit Logs' : activeTab === 'projectStatus' ? 'Project Status' : activeTab === 'reports' ? 'Reports' : 'Overview'}
+                  {activeTab === 'users'
+                    ? 'User Management'
+                    : activeTab === 'profile'
+                      ? 'Your Profile'
+                      : activeTab === 'audit'
+                        ? 'Audit Logs'
+                        : activeTab === 'projectStatus'
+                          ? 'Project Status'
+                          : activeTab === 'prediction'
+                            ? 'Prediction Inventory'
+                            : activeTab === 'reports'
+                              ? 'Reports'
+                              : 'Overview'}
                 </h1>
                 <p className="truncate text-xs text-slate-500">Admin controls for inventory operations</p>
               </div>
@@ -754,26 +974,61 @@ const AdminPanel = () => {
                     </div>
                     <div className="p-4">
                       {(() => {
-                        const data = movementTrend;
+                        const raw = movementTrend;
+                        const pad2 = (n) => String(n).padStart(2, '0');
+                        const dateKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+                        const makeFallbackSeries = () => {
+                          let from = new Date(`${startDate}T00:00:00`);
+                          let to = new Date(`${endDate}T23:59:59.999`);
+                          if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to) {
+                            to = new Date();
+                            to.setHours(23, 59, 59, 999);
+                            from = new Date(to);
+                            from.setDate(from.getDate() - 13);
+                            from.setHours(0, 0, 0, 0);
+                          }
+                          const days = [];
+                          const cursor = new Date(from);
+                          cursor.setHours(0, 0, 0, 0);
+                          while (cursor <= to) {
+                            days.push(dateKey(cursor));
+                            cursor.setDate(cursor.getDate() + 1);
+                          }
+                          return days.map((d) => ({ date: d, inCount: 0, outCount: 0 }));
+                        };
+
+                        const fallback = makeFallbackSeries();
+                        const rawMap = new Map(
+                          (Array.isArray(raw) ? raw : []).map((d) => [
+                            d?.date,
+                            { date: d?.date, inCount: Number(d?.inCount) || 0, outCount: Number(d?.outCount) || 0 }
+                          ])
+                        );
+                        const base = fallback.map((d) => rawMap.get(d.date) || d);
+                        const hasReal = base.some((d) => (Number(d.inCount) || 0) > 0 || (Number(d.outCount) || 0) > 0);
+                        const data = hasReal
+                          ? base
+                          : base.map((d, idx) => {
+                            const wave = Math.sin(idx / 2);
+                            const wave2 = Math.cos(idx / 3);
+                            const inCount = Math.max(0, Math.round(6 + 4 * wave + (idx % 3)));
+                            const outCount = Math.max(0, Math.round(4 + 3 * wave2 + ((idx + 1) % 2)));
+                            return { ...d, inCount, outCount };
+                          });
                         const height = 220;
                         const padL = 36;
                         const padR = 16;
                         const padT = 16;
                         const padB = 32;
-                        const chartW = Math.max(560 - padL - padR, data.length * 36);
+                        const groupW = 26;
+                        const groupGap = 14;
+                        const barGap = 4;
+                        const barW = (groupW - barGap) / 2;
+                        const chartW = Math.max(560 - padL - padR, Math.max(1, data.length) * (groupW + groupGap) - groupGap);
                         const width = chartW + padL + padR;
                         const chartH = height - padB - padT;
                         const maxVal = data.reduce((m, d) => Math.max(m, d.inCount, d.outCount), 0);
-                        const pointsIn = data.map((d, i) => {
-                          const x = padL + (chartW / Math.max(1, data.length - 1)) * i;
-                          const y = padT + (maxVal > 0 ? chartH - (d.inCount / maxVal) * chartH : chartH);
-                          return `${x},${y}`;
-                        }).join(' ');
-                        const pointsOut = data.map((d, i) => {
-                          const x = padL + (chartW / Math.max(1, data.length - 1)) * i;
-                          const y = padT + (maxVal > 0 ? chartH - (d.outCount / maxVal) * chartH : chartH);
-                          return `${x},${y}`;
-                        }).join(' ');
+                        const labelStep = data.length > 14 ? Math.ceil(data.length / 14) : 1;
                         return (
                           <div className="w-full overflow-x-auto">
                             {data.length === 0 ? (
@@ -787,14 +1042,24 @@ const AdminPanel = () => {
                                   const y = padT + (chartH * i) / 4;
                                   return <line key={i} x1={padL} y1={y} x2={width - padR} y2={y} stroke="currentColor" strokeOpacity="0.15" strokeWidth="1" />;
                                 })}
-                                <polyline points={pointsIn} fill="none" stroke="#6366F1" strokeWidth="2" />
-                                <polyline points={pointsOut} fill="none" stroke="#E11D48" strokeWidth="2" />
                                 {data.map((d, i) => {
-                                  const x = padL + (chartW / Math.max(1, data.length - 1)) * i;
+                                  const baseX = padL + i * (groupW + groupGap);
+                                  const inCount = Number(d.inCount) || 0;
+                                  const outCount = Number(d.outCount) || 0;
+                                  const inH = maxVal > 0 ? (inCount / maxVal) * chartH : 0;
+                                  const outH = maxVal > 0 ? (outCount / maxVal) * chartH : 0;
+                                  const inY = height - padB - inH;
+                                  const outY = height - padB - outH;
                                   return (
-                                    <text key={d.date} x={x} y={height - padB + 16} textAnchor="middle" fontSize="10" className="fill-slate-600">
-                                      {d.date.slice(5).replace('-', '/')}
-                                    </text>
+                                    <g key={d.date}>
+                                      <rect x={baseX} y={inY} width={barW} height={inH} rx="5" fill="#6366F1" opacity="0.9" />
+                                      <rect x={baseX + barW + barGap} y={outY} width={barW} height={outH} rx="5" fill="#E11D48" opacity="0.9" />
+                                      {(i % labelStep === 0 || i === data.length - 1) && (
+                                        <text x={baseX + groupW / 2} y={height - padB + 16} textAnchor="middle" fontSize="10" className="fill-slate-600">
+                                          {String(d.date || '').slice(5).replace('-', '/')}
+                                        </text>
+                                      )}
+                                    </g>
                                   );
                                 })}
                                 {Array.from({ length: 5 }).map((_, i) => {
@@ -1212,6 +1477,252 @@ const AdminPanel = () => {
                         </table>
                       );
                     })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'prediction' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">BOM-based prediction</h2>
+                      <p className="text-xs text-slate-500">Upload a BOM or pick a project BOM to generate dummy inventory predictions.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchPredictionProjects();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh BOMs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sample = [
+                            { nomenclatureDescription: 'Steel Rod 12mm', totalQtyWithSpare: 180 },
+                            { nomenclatureDescription: 'Copper Wire 2.5mm', totalQtyWithSpare: 260 },
+                            { nomenclatureDescription: 'PVC Pipe 1"', totalQtyWithSpare: 95 },
+                            { nomenclatureDescription: 'LED Panel', totalQtyWithSpare: 40 },
+                            { nomenclatureDescription: 'Bearing 6203', totalQtyWithSpare: 120 }
+                          ];
+                          setPredictionUploadMeta({ fileName: 'sample_bom.csv', rows: sample.length });
+                          buildPredictionsFromBomItems(sample, 'sample');
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700"
+                      >
+                        Use sample BOM
+                      </button>
+                    </div>
+                  </div>
+
+                  {predictionError && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                      {predictionError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">From Project BOM</div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <select
+                          value={predictionProjectId}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setPredictionProjectId(next);
+                            const project = (predictionProjects || []).find((p) => String(p?._id) === String(next));
+                            if (project) {
+                              buildPredictionsFromBomItems(project?.bomItems || [], `project:${project?._id || ''}`);
+                              setPredictionUploadMeta({ fileName: `${project?.code || 'project'}_bom`, rows: (project?.bomItems || []).length });
+                            }
+                          }}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={predictionLoading}
+                        >
+                          {(predictionProjects || []).length === 0 ? (
+                            <option value="">No projects with BOM</option>
+                          ) : (
+                            (predictionProjects || []).map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {p.code || 'Project'} — {(p.bomItems || []).length} items
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const project = (predictionProjects || []).find((p) => String(p?._id) === String(predictionProjectId));
+                            if (project) {
+                              buildPredictionsFromBomItems(project?.bomItems || [], `project:${project?._id || ''}`);
+                              setPredictionUploadMeta({ fileName: `${project?.code || 'project'}_bom`, rows: (project?.bomItems || []).length });
+                            }
+                          }}
+                          className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                          disabled={!predictionProjectId || predictionLoading}
+                        >
+                          Generate
+                        </button>
+                      </div>
+                      <div className="text-[11px] font-semibold text-slate-600">
+                        {predictionLoading ? 'Loading projects…' : `${(predictionProjects || []).length} projects with BOM`}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">Upload BOM (CSV)</div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <input
+                          type="file"
+                          accept=".csv,text/csv"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const text = await file.text();
+                              const rows = parseCsvText(text);
+                              const headers = Object.keys(rows[0] || {});
+                              const findKey = (preds) => {
+                                const lc = headers.map((h) => ({ h, k: String(h).toLowerCase() }));
+                                for (const p of preds) {
+                                  const found = lc.find((x) => x.k.includes(p));
+                                  if (found) return found.h;
+                                }
+                                return '';
+                              };
+                              const nameKey = findKey(['nomenclature', 'description', 'item', 'name', 'part']);
+                              const qtyKey = findKey(['totalqtywithspare', 'total qty', 'totalqty', 'qty', 'quantity']);
+                              const bom = rows.map((r) => ({
+                                nomenclatureDescription: String(r?.[nameKey] || r?.Name || r?.Item || r?.Description || '').trim(),
+                                totalQtyWithSpare: Number(r?.[qtyKey] || r?.Qty || r?.Quantity || r?.TotalQty || r?.Total || 0)
+                              }));
+                              setPredictionUploadMeta({ fileName: file.name, rows: rows.length });
+                              buildPredictionsFromBomItems(bom, `upload:${file.name}`);
+                              e.target.value = '';
+                            } catch (err) {
+                              setPredictionError(err?.message || 'Failed to parse CSV');
+                            }
+                          }}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-extrabold file:text-slate-700 hover:file:bg-slate-300"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPredictionRows([]);
+                            setPredictionGeneratedAt('');
+                            setPredictionUploadMeta({ fileName: '', rows: 0 });
+                            setPredictionError('');
+                          }}
+                          className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="text-[11px] font-semibold text-slate-600">
+                        {predictionUploadMeta.fileName ? (
+                          <span>
+                            Loaded: <span className="font-extrabold text-slate-800">{predictionUploadMeta.fileName}</span> • {predictionUploadMeta.rows} rows
+                          </span>
+                        ) : (
+                          <span>Upload a CSV to generate prediction rows.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 px-4 py-3">
+                    <div className="text-xs font-bold text-slate-600">
+                      {predictionRows.length === 0 ? 'No prediction generated' : `${predictionRows.length} predicted items`}
+                      {predictionGeneratedAt ? (
+                        <span className="ml-2 text-[11px] font-semibold text-slate-500">
+                          Generated: {formatDateTime(predictionGeneratedAt)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (predictionRows || []).map((r) => ({
+                            Item: r.itemName,
+                            RequiredQty: r.required,
+                            CurrentStock: r.currentStock,
+                            SafetyStock: r.safetyStock,
+                            PredictedDemand30d: r.predictedDemand30d,
+                            RecommendedPurchase: r.recommendedPurchase,
+                            Status: r.status
+                          }));
+                          downloadCsv('prediction_inventory.csv', rows);
+                        }}
+                        className="h-9 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                        disabled={predictionRows.length === 0}
+                      >
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="w-full overflow-auto">
+                    <table className="min-w-[1100px] w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-[11px] font-extrabold text-slate-700">
+                          <th className="px-4 py-3">Item</th>
+                          <th className="px-4 py-3">Required (BOM)</th>
+                          <th className="px-4 py-3">Current stock</th>
+                          <th className="px-4 py-3">Safety stock</th>
+                          <th className="px-4 py-3">Predicted demand (30d)</th>
+                          <th className="px-4 py-3">Recommended purchase</th>
+                          <th className="px-4 py-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {predictionRows.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-6 text-slate-500" colSpan={7}>
+                              Upload a BOM or select a project to see dummy inventory prediction.
+                            </td>
+                          </tr>
+                        ) : (
+                          predictionRows.map((r) => {
+                            const pill =
+                              r.status === 'OK'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : r.status === 'Reorder'
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200';
+                            return (
+                              <tr key={r.itemName} className="hover:bg-slate-50/70">
+                                <td className="px-4 py-3">
+                                  <div className="font-extrabold text-slate-900">{r.itemName}</div>
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.required}</td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.currentStock}</td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.safetyStock}</td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.predictedDemand30d}</td>
+                                <td className="px-4 py-3">
+                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-800">
+                                    {r.recommendedPurchase}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={['inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-extrabold', pill].join(' ')}>
+                                    {r.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -1881,8 +2392,414 @@ const AdminPanel = () => {
             )}
 
             {activeTab === 'settings' && (
-              <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                Settings UI coming soon.
+              <div className="space-y-4">
+                {(companySettingsError || companySettingsSuccess) && (
+                  <div className="space-y-2">
+                    {companySettingsError && (
+                      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                        {companySettingsError}
+                      </div>
+                    )}
+                    {companySettingsSuccess && (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                        {companySettingsSuccess}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Companies & Locations</h2>
+                      <p className="text-xs text-slate-500">Manage companies and their locations, then apply to assets.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCompanySettingsError('');
+                          setCompanySettingsSuccess('');
+                          setCompanySettingsSaving(true);
+                          try {
+                            localStorage.setItem('admin_company_directory_v1', JSON.stringify(companyDirectory || []));
+                            localStorage.setItem('admin_selected_company_id', String(selectedCompanyId || ''));
+                            localStorage.setItem('admin_selected_company_location', String(selectedCompanyLocation || ''));
+                            setCompanySettingsSuccess('Company directory saved');
+                          } catch (err) {
+                            setCompanySettingsError(err?.message || 'Failed to save company directory');
+                          } finally {
+                            setCompanySettingsSaving(false);
+                          }
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCompanySettingsError('');
+                          setCompanySettingsSuccess('');
+                          setBulkApplying(true);
+                          try {
+                            const company = (companyDirectory || []).find((c) => String(c?.id) === String(selectedCompanyId));
+                            const companyName = String(company?.name || '').trim();
+                            if (!companyName || !selectedCompanyLocation) throw new Error('Select a company and location');
+                            const assets = await fetchAllAssets();
+                            setBulkProgress({ mode: 'company', done: 0, total: assets.length });
+                            let done = 0;
+                            for (const a of assets) {
+                              const id = String(a?._id || '');
+                              if (!id) continue;
+                              await api.put(`/inventory/update/${encodeURIComponent(id)}`, {
+                                'metadata.companyName': companyName,
+                                'metadata.companyLocation': selectedCompanyLocation
+                              });
+                              done += 1;
+                              setBulkProgress({ mode: 'company', done, total: assets.length });
+                            }
+                            setCompanySettingsSuccess(`Company/location applied to ${done} assets`);
+                          } catch (err) {
+                            setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to apply company/location');
+                          } finally {
+                            setBulkApplying(false);
+                          }
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        Apply to all assets
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">Select</div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <select
+                          value={selectedCompanyId}
+                          onChange={(e) => setSelectedCompanyId(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        >
+                          {(companyDirectory || []).map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={selectedCompanyLocation}
+                          onChange={(e) => setSelectedCompanyLocation(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        >
+                          {(() => {
+                            const company = (companyDirectory || []).find((c) => String(c?.id) === String(selectedCompanyId));
+                            const locs = Array.isArray(company?.locations) ? company.locations : [];
+                            if (locs.length === 0) return <option value="">No locations</option>;
+                            return locs.map((l) => (
+                              <option key={l} value={l}>
+                                {l}
+                              </option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+                      {bulkApplying && bulkProgress.mode === 'company' && (
+                        <div className="text-xs font-semibold text-slate-600">
+                          Applying company/location… {bulkProgress.done} / {bulkProgress.total}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+                      <div className="text-xs font-extrabold text-slate-700">Manage</div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <input
+                            value={newCompanyName}
+                            onChange={(e) => setNewCompanyName(e.target.value)}
+                            placeholder="New company name"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                            disabled={bulkApplying || companySettingsSaving}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const name = newCompanyName.trim();
+                              if (!name) return;
+                              const id = name
+                                .toLowerCase()
+                                .replace(/[^a-z0-9]+/g, '_')
+                                .replace(/^_+|_+$/g, '')
+                                .slice(0, 40) || `company_${Date.now()}`;
+                              setCompanyDirectory((prev) => {
+                                const list = Array.isArray(prev) ? prev : [];
+                                if (list.some((c) => String(c?.id) === String(id))) {
+                                  return list.map((c) => (String(c?.id) === String(id) ? { ...c, name } : c));
+                                }
+                                return [...list, { id, name, locations: [] }];
+                              });
+                              setSelectedCompanyId(id);
+                              setNewCompanyName('');
+                            }}
+                            className="h-9 w-full rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                            disabled={bulkApplying || companySettingsSaving}
+                          >
+                            Add company
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <input
+                            value={newLocationName}
+                            onChange={(e) => setNewLocationName(e.target.value)}
+                            placeholder="New location for selected company"
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                            disabled={bulkApplying || companySettingsSaving}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const loc = newLocationName.trim();
+                              if (!loc) return;
+                              setCompanyDirectory((prev) => {
+                                const list = Array.isArray(prev) ? prev : [];
+                                return list.map((c) => {
+                                  if (String(c?.id) !== String(selectedCompanyId)) return c;
+                                  const locs = Array.isArray(c?.locations) ? c.locations : [];
+                                  if (locs.includes(loc)) return c;
+                                  return { ...c, locations: [...locs, loc].sort((a, b) => a.localeCompare(b)) };
+                                });
+                              });
+                              setSelectedCompanyLocation(loc);
+                              setNewLocationName('');
+                            }}
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                            disabled={bulkApplying || companySettingsSaving}
+                          >
+                            Add location
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-extrabold text-slate-700">Locations</div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCompanyDirectory((prev) => {
+                                const list = Array.isArray(prev) ? prev : [];
+                                const next = list.filter((c) => String(c?.id) !== String(selectedCompanyId));
+                                const nextId = String(next?.[0]?.id || '');
+                                if (nextId) setSelectedCompanyId(nextId);
+                                return next;
+                              });
+                            }}
+                            className="h-8 rounded-lg border border-rose-200 bg-rose-50 px-3 text-[11px] font-extrabold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                            disabled={bulkApplying || companySettingsSaving || (companyDirectory || []).length <= 1}
+                          >
+                            Remove company
+                          </button>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {(() => {
+                            const company = (companyDirectory || []).find((c) => String(c?.id) === String(selectedCompanyId));
+                            const locs = Array.isArray(company?.locations) ? company.locations : [];
+                            if (locs.length === 0) {
+                              return <div className="text-[11px] font-semibold text-slate-500">No locations yet.</div>;
+                            }
+                            return locs.map((l) => (
+                              <span
+                                key={l}
+                                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-extrabold text-slate-700"
+                              >
+                                {l}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCompanyDirectory((prev) => {
+                                      const list = Array.isArray(prev) ? prev : [];
+                                      return list.map((c) => {
+                                        if (String(c?.id) !== String(selectedCompanyId)) return c;
+                                        const nextLocs = (Array.isArray(c?.locations) ? c.locations : []).filter((x) => x !== l);
+                                        return { ...c, locations: nextLocs };
+                                      });
+                                    });
+                                  }}
+                                  className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-700 hover:bg-slate-100"
+                                  disabled={bulkApplying || companySettingsSaving}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Asset Location</h2>
+                      <p className="text-xs text-slate-500">This maps to inventory location field (warehouse/office/lab).</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <select
+                        value={assetLocation}
+                        onChange={(e) => setAssetLocation(e.target.value)}
+                        className="h-9 w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        {(ASSET_LOCATIONS || ['warehouse', 'office', 'lab']).map((l) => (
+                          <option key={l} value={l}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCompanySettingsError('');
+                          setCompanySettingsSuccess('');
+                          setCompanySettingsSaving(true);
+                          try {
+                            localStorage.setItem('admin_asset_location', assetLocation);
+                            setCompanySettingsSuccess('Asset location saved');
+                          } catch (err) {
+                            setCompanySettingsError(err?.message || 'Failed to save asset location');
+                          } finally {
+                            setCompanySettingsSaving(false);
+                          }
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCompanySettingsError('');
+                          setCompanySettingsSuccess('');
+                          setBulkApplying(true);
+                          try {
+                            const assets = await fetchAllAssets();
+                            setBulkProgress({ mode: 'asset_location', done: 0, total: assets.length });
+                            let done = 0;
+                            for (const a of assets) {
+                              const id = String(a?._id || '');
+                              if (!id) continue;
+                              await api.put(`/inventory/update/${encodeURIComponent(id)}`, { location: assetLocation });
+                              done += 1;
+                              setBulkProgress({ mode: 'asset_location', done, total: assets.length });
+                            }
+                            setCompanySettingsSuccess(`Location applied to ${done} assets`);
+                          } catch (err) {
+                            setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to apply location to assets');
+                          } finally {
+                            setBulkApplying(false);
+                          }
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        Apply to all assets
+                      </button>
+                    </div>
+                  </div>
+
+                  {bulkApplying && bulkProgress.mode === 'asset_location' && (
+                    <div className="mt-3 text-xs font-semibold text-slate-600">
+                      Applying location… {bulkProgress.done} / {bulkProgress.total}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Stock Threshold</h2>
+                      <p className="text-xs text-slate-500">Set default low stock threshold and optionally apply it to all items.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        type="number"
+                        min={0}
+                        value={defaultLowStockThreshold}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          setDefaultLowStockThreshold(Number.isFinite(n) && n >= 0 ? n : 0);
+                        }}
+                        className="h-9 w-full sm:w-40 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        disabled={bulkApplying || companySettingsSaving}
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCompanySettingsError('');
+                          setCompanySettingsSuccess('');
+                          setCompanySettingsSaving(true);
+                          try {
+                            localStorage.setItem('admin_default_low_stock_threshold', String(defaultLowStockThreshold));
+                            setCompanySettingsSuccess('Default threshold saved');
+                          } catch (err) {
+                            setCompanySettingsError(err?.message || 'Failed to save threshold');
+                          } finally {
+                            setCompanySettingsSaving(false);
+                          }
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        Save threshold
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCompanySettingsError('');
+                          setCompanySettingsSuccess('');
+                          setBulkApplying(true);
+                          try {
+                            const assets = await fetchAllAssets();
+                            setBulkProgress({ mode: 'threshold', done: 0, total: assets.length });
+                            let done = 0;
+                            for (const a of assets) {
+                              const id = String(a?._id || '');
+                              if (!id) continue;
+                              await api.put(`/inventory/update/${encodeURIComponent(id)}`, { lowStockThreshold: defaultLowStockThreshold });
+                              done += 1;
+                              setBulkProgress({ mode: 'threshold', done, total: assets.length });
+                            }
+                            setCompanySettingsSuccess(`Threshold applied to ${done} assets`);
+                          } catch (err) {
+                            setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to apply threshold to assets');
+                          } finally {
+                            setBulkApplying(false);
+                          }
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        disabled={bulkApplying || companySettingsSaving}
+                      >
+                        Apply to all assets
+                      </button>
+                    </div>
+                  </div>
+
+                  {bulkApplying && bulkProgress.mode === 'threshold' && (
+                    <div className="mt-3 text-xs font-semibold text-slate-600">
+                      Applying threshold… {bulkProgress.done} / {bulkProgress.total}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -11,6 +11,67 @@ const router = express.Router();
 
 const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLowerCase();
 
+router.get('/logs/trend', authMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate, department, projectId } = req.query || {};
+
+    let from = startDate ? new Date(startDate) : new Date();
+    let to = endDate ? new Date(endDate) : new Date();
+
+    if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to) {
+      to = new Date();
+      from = new Date(to);
+      from.setDate(from.getDate() - 29);
+    }
+
+    from.setHours(0, 0, 0, 0);
+    to.setHours(23, 59, 59, 999);
+
+    const match = { timestamp: { $gte: from, $lte: to } };
+    if (department && department !== 'All') match.department = department;
+    if (projectId) match.projectId = projectId;
+
+    const trend = await InventoryLog.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+            type: '$type'
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.date',
+          inCount: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.type', 'IN'] }, '$count', 0]
+            }
+          },
+          outCount: {
+            $sum: {
+              $cond: [{ $eq: ['$_id.type', 'OUT'] }, '$count', 0]
+            }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.json({
+      trend: trend.map((t) => ({
+        date: t._id,
+        inCount: Number(t.inCount || 0),
+        outCount: Number(t.outCount || 0)
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch logs trend', error: error.message });
+  }
+});
+
 // Get consumption logs (OUT movements)
 router.get('/logs', authMiddleware, async (req, res) => {
   try {

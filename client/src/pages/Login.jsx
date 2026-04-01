@@ -66,7 +66,7 @@ const Login = () => {
                           decoding="async"
                         />
                       </span>
-                      Inventory Management Suite
+                      Inventory Management Dashboard
                     </div>
                     <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-slate-900">
                       Track stock, assets, and workflows in one place.
