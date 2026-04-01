@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download } from 'lucide-react';
 import UserManagement from '../components/UserManagement';
@@ -39,6 +39,7 @@ const AdminPanel = () => {
   const [projectStatusError, setProjectStatusError] = useState('');
   const [projectStatusSearch, setProjectStatusSearch] = useState('');
   const [projectStatusDept, setProjectStatusDept] = useState('all');
+  const [projectStatusExpanded, setProjectStatusExpanded] = useState({});
   const [reportDept, setReportDept] = useState('all');
   const [reportSearch, setReportSearch] = useState('');
   const [lowStockRows, setLowStockRows] = useState([]);
@@ -1054,17 +1055,18 @@ const AdminPanel = () => {
                               <th className="px-4 py-3">Inventory allocated</th>
                               <th className="px-4 py-3">BOM created</th>
                               <th className="px-4 py-3">Utilization</th>
+                              <th className="px-4 py-3">Inventory used</th>
                               <th className="px-4 py-3">Last activity</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {projectStatusLoading ? (
                               <tr>
-                                <td className="px-4 py-4 text-slate-500" colSpan={6}>Loading…</td>
+                                <td className="px-4 py-4 text-slate-500" colSpan={7}>Loading…</td>
                               </tr>
                             ) : rows.length === 0 ? (
                               <tr>
-                                <td className="px-4 py-4 text-slate-500" colSpan={6}>No projects found.</td>
+                                <td className="px-4 py-4 text-slate-500" colSpan={7}>No projects found.</td>
                               </tr>
                             ) : (
                               rows.map((p) => {
@@ -1075,44 +1077,134 @@ const AdminPanel = () => {
                                 const utilDen = Number(util?.denominator || 0);
                                 const utilUsed = Number(util?.usedTotal || 0);
                                 const utilPct = Number(util?.percent || 0);
+                                const projectId = String(p?.id || p?._id || p?.code || '');
+                                const items = Array.isArray(p?.inventoryItems) ? p.inventoryItems : [];
+                                const isExpanded = Boolean(projectStatusExpanded?.[projectId]);
+                                const statusBadge = (status) => (
+                                  <span
+                                    className={[
+                                      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider',
+                                      status === 'Utilized'
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : status === 'Partially utilized'
+                                          ? 'bg-amber-100 text-amber-800'
+                                          : status === 'Allocated'
+                                            ? 'bg-sky-100 text-sky-800'
+                                            : 'bg-slate-100 text-slate-800'
+                                    ].join(' ')}
+                                  >
+                                    {status}
+                                  </span>
+                                );
                                 return (
-                                  <tr key={p?.id || p?._id || p?.code} className="hover:bg-slate-50/70">
-                                    <td className="px-4 py-3">
-                                      <div className="font-extrabold text-slate-900">{p?.code || '-'}</div>
-                                      <div className="text-[11px] font-semibold text-slate-600">{p?.name || ''}</div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <div className="text-[11px] font-extrabold text-slate-700">{p?.department || '-'}</div>
-                                      <div className="text-[11px] font-semibold text-slate-500">{String(p?.status || '').replace('_', ' ')}</div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <div className="flex flex-col gap-1">
-                                        {badge(allocated, allocated ? 'Allocated' : 'Not allocated')}
-                                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.inventoryAllocated?.at)}</div>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <div className="flex flex-col gap-1">
-                                        {badge(bom, bom ? 'Created' : 'Not created')}
-                                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.bomCreated?.at)}</div>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-extrabold text-slate-900">{utilDen > 0 ? `${utilPct}%` : '—'}</span>
-                                          <span className="text-[11px] font-bold text-slate-500">{utilBasis}</span>
+                                  <Fragment key={projectId || p?.id || p?._id || p?.code}>
+                                    <tr className="hover:bg-slate-50/70">
+                                      <td className="px-4 py-3">
+                                        <div className="font-extrabold text-slate-900">{p?.code || '-'}</div>
+                                        <div className="text-[11px] font-semibold text-slate-600">{p?.name || ''}</div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="text-[11px] font-extrabold text-slate-700">{p?.department || '-'}</div>
+                                        <div className="text-[11px] font-semibold text-slate-500">{String(p?.status || '').replace('_', ' ')}</div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex flex-col gap-1">
+                                          {badge(allocated, allocated ? 'Allocated' : 'Not allocated')}
+                                          <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.inventoryAllocated?.at)}</div>
                                         </div>
-                                        <div className="text-[11px] font-semibold text-slate-600">
-                                          {utilDen > 0 ? `${utilUsed} / ${utilDen}` : 'No planned/allocated qty'}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex flex-col gap-1">
+                                          {badge(bom, bom ? 'Created' : 'Not created')}
+                                          <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.bomCreated?.at)}</div>
                                         </div>
-                                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(util?.at)}</div>
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">
-                                      {formatDateTime(p?.lastActivityAt)}
-                                    </td>
-                                  </tr>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex flex-col gap-1">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm font-extrabold text-slate-900">{utilDen > 0 ? `${utilPct}%` : '—'}</span>
+                                            <span className="text-[11px] font-bold text-slate-500">{utilBasis}</span>
+                                          </div>
+                                          <div className="text-[11px] font-semibold text-slate-600">
+                                            {utilDen > 0 ? `${utilUsed} / ${utilDen}` : 'No planned/allocated qty'}
+                                          </div>
+                                          <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(util?.at)}</div>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="text-[11px] font-semibold text-slate-600">{items.length} items</div>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setProjectStatusExpanded((prev) => ({
+                                                ...prev,
+                                                [projectId]: !prev?.[projectId]
+                                              }));
+                                            }}
+                                            className="h-7 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+                                          >
+                                            {isExpanded ? 'Hide' : 'View'}
+                                          </button>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">
+                                        {formatDateTime(p?.lastActivityAt)}
+                                      </td>
+                                    </tr>
+                                    {isExpanded ? (
+                                      <tr className="bg-slate-50/60">
+                                        <td className="px-4 py-4" colSpan={7}>
+                                          {items.length === 0 ? (
+                                            <div className="text-[11px] font-semibold text-slate-600">
+                                              No inventory planned/allocated/used for this project.
+                                            </div>
+                                          ) : (
+                                            <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
+                                              <table className="min-w-[1100px] w-full text-left text-xs">
+                                                <thead className="bg-slate-50 border-b border-slate-200">
+                                                  <tr className="text-[11px] font-extrabold text-slate-700">
+                                                    <th className="px-3 py-2">Item</th>
+                                                    <th className="px-3 py-2">Asset ID</th>
+                                                    <th className="px-3 py-2">SKU</th>
+                                                    <th className="px-3 py-2">Planned</th>
+                                                    <th className="px-3 py-2">Allocated</th>
+                                                    <th className="px-3 py-2">Used</th>
+                                                    <th className="px-3 py-2">Remaining</th>
+                                                    <th className="px-3 py-2">Status</th>
+                                                    <th className="px-3 py-2">Unit</th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                  {items
+                                                    .slice()
+                                                    .sort((a, b) => Number(b?.usedQuantity || 0) - Number(a?.usedQuantity || 0))
+                                                    .map((it) => (
+                                                      <tr key={`${projectId}-${it?.assetId || it?.sku || it?.itemName}`}>
+                                                        <td className="px-3 py-2">
+                                                          <div className="font-bold text-slate-900">{it?.itemName || '-'}</div>
+                                                          <div className="text-[11px] font-semibold text-slate-500">
+                                                            {it?.basisType === 'allocated' ? 'Basis: Allocated' : it?.basisType === 'planned' ? 'Basis: Planned' : 'Basis: —'}
+                                                          </div>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.assetId || '-'}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.sku || '-'}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.plannedQuantity || 0)}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.allocatedQuantity || 0)}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.usedQuantity || 0)}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.remainingQuantity || 0)}</td>
+                                                        <td className="px-3 py-2">{statusBadge(it?.status || 'Planned')}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.unit || 'pcs'}</td>
+                                                      </tr>
+                                                    ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ) : null}
+                                  </Fragment>
                                 );
                               })
                             )}

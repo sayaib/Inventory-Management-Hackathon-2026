@@ -158,7 +158,7 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
         {
           $group: {
             _id: '$_id.projectId',
-            byAsset: { $push: { assetId: '$_id.assetId', usedQuantity: '$usedQuantity' } },
+            byAsset: { $push: { assetId: '$_id.assetId', usedQuantity: '$usedQuantity', lastAt: '$lastAt' } },
             lastAt: { $max: '$lastAt' }
           }
         }
@@ -185,7 +185,10 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
       const assetMap = new Map();
       for (const item of row.byAsset || []) {
         if (!item?.assetId) continue;
-        assetMap.set(String(item.assetId), Number(item.usedQuantity || 0));
+        assetMap.set(String(item.assetId), {
+          usedQuantity: Number(item.usedQuantity || 0),
+          lastAt: item.lastAt || null
+        });
       }
       usageByProjectId.set(String(row._id), { assetMap, lastAt: row.lastAt || null });
     }
@@ -221,9 +224,11 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
 
       let usedTotal = 0;
       let latestManualAt = null;
+      const inventoryItems = [];
       for (const m of materials) {
         const assetId = String(m?.assetId || '');
-        const usedFromLogs = assetId ? Number(usedFromLogsByAssetId.get(assetId) || 0) : 0;
+        const usageRow = assetId ? usedFromLogsByAssetId.get(assetId) : null;
+        const usedFromLogs = Number(usageRow?.usedQuantity || 0);
         const hasOverride = m?.usedQuantityOverride !== null && m?.usedQuantityOverride !== undefined;
         const usedOverride = hasOverride ? Number(m.usedQuantityOverride) : null;
         const used = Math.max(0, hasOverride ? Math.max(usedFromLogs, usedOverride) : usedFromLogs);
@@ -234,18 +239,40 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
           if (!ts || Number.isNaN(ts.getTime())) continue;
           if (!latestManualAt || ts > latestManualAt) latestManualAt = ts;
         }
+
+        const plannedQuantity = Math.max(0, Number(m?.plannedQuantity || 0));
+        const allocatedQuantity = Math.max(0, Number(m?.allocatedQuantity || 0));
+        const basisType = allocatedQuantity > 0 ? 'allocated' : plannedQuantity > 0 ? 'planned' : 'none';
+        const basisQuantity = basisType === 'allocated' ? allocatedQuantity : basisType === 'planned' ? plannedQuantity : 0;
+        const remainingQuantity = Math.max(0, basisQuantity - used);
+        const status = (() => {
+          if (used > 0 && (allocatedQuantity > 0 || used < plannedQuantity)) return 'Partially utilized';
+          if (used > 0) return 'Utilized';
+          if (allocatedQuantity > 0) return 'Allocated';
+          return 'Planned';
+        })();
+
+        if (plannedQuantity > 0 || allocatedQuantity > 0 || used > 0) {
+          inventoryItems.push({
+            assetId: m?.assetId || '',
+            sku: m?.sku || '',
+            itemName: m?.itemName || '',
+            unit: m?.unit || 'pcs',
+            plannedQuantity,
+            allocatedQuantity,
+            usedQuantity: Math.round((used + Number.EPSILON) * 100) / 100,
+            basisType,
+            basisQuantity: Math.round((basisQuantity + Number.EPSILON) * 100) / 100,
+            remainingQuantity: Math.round((remainingQuantity + Number.EPSILON) * 100) / 100,
+            status,
+            lastUsedAt: usageRow?.lastAt ? new Date(usageRow.lastAt).toISOString() : null
+          });
+        }
       }
 
       const utilizationDenom = allocatedTotal > 0 ? allocatedTotal : plannedTotal;
       const utilizationPercent =
         utilizationDenom > 0 ? Math.round(((usedTotal / utilizationDenom) * 100 + Number.EPSILON) * 10) / 10 : 0;
-
-      const allocationMeta = allocationByProjectId.get(pId) || {};
-      const hasEverAllocated = Boolean(toIsoOrNull(allocationMeta.PROJECT_MATERIALS_ALLOCATE)) || hasAllocation;
-      const inventoryAllocatedAt =
-        toIsoOrNull(allocationMeta.PROJECT_MATERIALS_ALLOCATE) || (hasAllocation ? toIsoOrNull(project.updatedAt) : null);
-      const materialsPlannedAt =
-        toIsoOrNull(allocationMeta.PROJECT_MATERIALS_PLAN_UPSERT) || (hasPlanning ? toIsoOrNull(project.updatedAt) : null);
 
       let bomAt = null;
       for (const item of bomItems) {
@@ -264,6 +291,14 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
         return manual || log || null;
       })();
 
+      const allocationMeta = allocationByProjectId.get(pId) || {};
+      const hasEverAllocated = Boolean(toIsoOrNull(allocationMeta.PROJECT_MATERIALS_ALLOCATE)) || hasAllocation || usedTotal > 0;
+      const inventoryAllocatedAt =
+        toIsoOrNull(allocationMeta.PROJECT_MATERIALS_ALLOCATE) ||
+        (hasAllocation ? toIsoOrNull(project.updatedAt) : usedTotal > 0 ? (latestUtilAt ? latestUtilAt.toISOString() : toIsoOrNull(project.updatedAt)) : null);
+      const materialsPlannedAt =
+        toIsoOrNull(allocationMeta.PROJECT_MATERIALS_PLAN_UPSERT) || (hasPlanning ? toIsoOrNull(project.updatedAt) : null);
+
       const lastActivityAt = (() => {
         const dates = [project.updatedAt, inventoryAllocatedAt, materialsPlannedAt, bomAt, latestUtilAt]
           .map((v) => (v ? new Date(v) : null))
@@ -279,6 +314,7 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
         department: project.department,
         status: project.status,
         updatedAt: toIsoOrNull(project.updatedAt),
+        inventoryItems,
         statuses: {
           inventoryAllocated: { value: hasEverAllocated, at: inventoryAllocatedAt },
           materialsPlanned: { value: hasPlanning, at: materialsPlannedAt },
