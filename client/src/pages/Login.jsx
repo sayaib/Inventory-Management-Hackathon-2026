@@ -5,6 +5,9 @@ import { ArrowRight, BarChart3, Eye, EyeOff, Loader2, Lock, LogIn, Mail, Package
 import { ROLES } from '../constants/roles';
 import heroImage from '../assets/hero.png';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +58,13 @@ const Login = () => {
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-700">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">
-                        <LogIn className="h-4 w-4" />
+                        <img
+                          src={APP_LOGO_URL}
+                          alt="Optimized Solutions Ltd"
+                          className="h-4 w-4 rounded-full bg-white object-contain"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       </span>
                       Inventory Management Suite
                     </div>
@@ -103,7 +112,13 @@ const Login = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-sm shadow-primary/20">
-                      <LogIn className="h-5 w-5" />
+                      <img
+                        src={APP_LOGO_URL}
+                        alt="Optimized Solutions Ltd"
+                        className="h-6 w-6 rounded bg-white object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Secure access</p>

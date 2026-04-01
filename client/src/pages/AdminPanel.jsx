@@ -6,6 +6,9 @@ import AuditLog from '../components/AuditLog';
 import AdminProfile from '../components/AdminProfile';
 import api from '../api/axios';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const AdminPanel = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
@@ -385,6 +388,25 @@ const AdminPanel = () => {
     list.sort((a, b) => String(a?.code || '').localeCompare(String(b?.code || '')));
     return list;
   })();
+ 
+  const dummyInventoryStatus = [
+    { name: 'Steel Rod 12mm', department: 'ATE', status: 'Completed', allocated: true, procured: true, utilUsed: 120, utilDen: 200, utilPct: 60, lastActivityAt: new Date().toISOString() },
+    { name: 'Copper Wire 2.5mm', department: 'IT', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
+    { name: 'PVC Pipe 1"', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 40, utilDen: 50, utilPct: 80, lastActivityAt: new Date().toISOString() },
+    { name: 'Server RAM 16GB', department: 'DTMA', status: 'In Progress', allocated: true, procured: false, utilUsed: 8, utilDen: 32, utilPct: 25, lastActivityAt: new Date().toISOString() },
+    { name: 'Safety Gloves', department: 'PES', status: 'Completed', allocated: true, procured: true, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
+    { name: 'Paint Primer', department: 'ATE', status: 'Completed', allocated: true, procured: true, utilUsed: 18, utilDen: 30, utilPct: 60, lastActivityAt: new Date().toISOString() },
+    { name: 'Router AX', department: 'IT', status: 'In Progress', allocated: false, procured: true, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
+    { name: 'Bearing 6203', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 75, utilDen: 100, utilPct: 75, lastActivityAt: new Date().toISOString() },
+    { name: 'LED Panel', department: 'DTMA', status: 'Completed', allocated: true, procured: true, utilUsed: 20, utilDen: 25, utilPct: 80, lastActivityAt: new Date().toISOString() },
+    { name: 'Cable Tray', department: 'PES', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null }
+  ];
+ 
+   const dummyInventoryStatusResolved = dummyInventoryStatus.map((r) => ({
+     ...r,
+     allocated: r.status === 'Completed' ? true : r.allocated,
+     procured: r.status === 'Completed' ? true : r.procured
+   }));
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100">
@@ -392,7 +414,13 @@ const AdminPanel = () => {
         <aside className="hidden w-60 shrink-0 border-r border-slate-800/40 bg-slate-950 text-slate-100 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
           <div className="flex items-center gap-3 px-4 py-4">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
-              <Shield className="h-5 w-5" />
+              <img
+                src={APP_LOGO_URL}
+                alt="Optimized Solutions Ltd"
+                className="h-6 w-6 rounded bg-white object-contain"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
             <div className="leading-tight">
               <div className="text-sm font-extrabold text-white">Admin Portal</div>
@@ -852,6 +880,86 @@ const AdminPanel = () => {
                             })
                           )}
                         </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+ 
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-extrabold text-slate-900">Current inventory status</div>
+                      <div className="text-xs text-slate-500">Allocated, utilization, and procurement (dummy)</div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-500">{dummyInventoryStatusResolved.length} items</div>
+                  </div>
+                  <div className="w-full overflow-auto">
+                    {(() => {
+                      const badge = (ok, yes, no) => (
+                        <span
+                          className={[
+                            'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold',
+                            ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-50 text-slate-700 border border-slate-200'
+                          ].join(' ')}
+                        >
+                          {ok ? yes : no}
+                        </span>
+                      );
+                      return (
+                        <table className="min-w-[1000px] w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr className="text-[11px] font-extrabold text-slate-700">
+                              <th className="px-4 py-3">Asset</th>
+                              <th className="px-4 py-3">Department</th>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3">Allocated</th>
+                              <th className="px-4 py-3">Utilization</th>
+                              <th className="px-4 py-3">Procured</th>
+                              <th className="px-4 py-3">Last activity</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {dummyInventoryStatusResolved.map((r, idx) => (
+                              <tr key={`${r.name}-${idx}`} className="hover:bg-slate-50/70">
+                                <td className="px-4 py-3">
+                                  <div className="font-extrabold text-slate-900">{r.name}</div>
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-extrabold text-slate-700">{r.department}</td>
+                                <td className="px-4 py-3">
+                                  {(() => {
+                                    const cls =
+                                      r.status === 'Completed'
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : r.status === 'In Progress'
+                                          ? 'bg-primary/10 text-primary-700 border border-primary/20'
+                                          : 'bg-slate-50 text-slate-700 border border-slate-200';
+                                    return (
+                                      <span className={['inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold', cls].join(' ')}>
+                                        {r.status || '—'}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {badge(r.allocated, 'Allocated', 'Not allocated')}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-extrabold text-slate-900">{r.utilDen > 0 ? `${r.utilPct}%` : '—'}</span>
+                                    <span className="text-[11px] font-bold text-slate-500">{r.utilDen > 0 ? 'Allocated' : '—'}</span>
+                                  </div>
+                                  <div className="text-[11px] font-semibold text-slate-600">
+                                    {r.utilDen > 0 ? `${r.utilUsed} / ${r.utilDen}` : 'No planned/allocated qty'}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  {badge(r.procured, 'Procured', 'Not procured')}
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">{formatDateTime(r.lastActivityAt)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       );
                     })()}
                   </div>

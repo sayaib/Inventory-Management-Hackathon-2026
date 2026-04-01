@@ -4,6 +4,9 @@ import api from '../api/axios';
 import { DEPARTMENTS } from '../constants/assets';
 import { BarChart3, Calculator, IndianRupee, LogOut, Search, TrendingDown, User as UserIcon } from 'lucide-react';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const formatCurrency = (value) => {
   const n = Number(value) || 0;
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
@@ -123,7 +126,13 @@ const FinancePanel = () => {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-primary rounded-lg">
-                <IndianRupee className="h-6 w-6 text-white" />
+                <img
+                  src={APP_LOGO_URL}
+                  alt="Optimized Solutions Ltd"
+                  className="h-6 w-6 rounded bg-white object-contain"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <span className="text-xl font-bold text-gray-900 tracking-tight">Finance</span>
             </div>

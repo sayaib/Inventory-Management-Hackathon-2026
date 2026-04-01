@@ -4,6 +4,9 @@ import { Loader2, Save, Trash2, User as UserIcon, ArrowLeft } from 'lucide-react
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const EMPTY_PROFILE = {
   firstName: '',
   lastName: '',
@@ -120,7 +123,13 @@ const Profile = () => {
               </Link>
               <div className="hidden sm:flex items-center gap-2 text-gray-900">
                 <div className="p-2 bg-primary rounded-lg">
-                  <UserIcon className="h-5 w-5 text-white" />
+                  <img
+                    src={APP_LOGO_URL}
+                    alt="Optimized Solutions Ltd"
+                    className="h-5 w-5 rounded bg-white object-contain"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <span className="text-lg font-bold tracking-tight">Profile</span>
               </div>

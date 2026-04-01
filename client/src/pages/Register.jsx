@@ -5,6 +5,9 @@ import { UserPlus, User, Lock, Mail, Loader2, Shield } from 'lucide-react';
 
 import { ROLES } from '../constants/roles';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const Register = () => {
   const [formData, setFormData] = useState({
     username: '',
@@ -50,7 +53,13 @@ const Register = () => {
       <div className="max-w-sm w-full space-y-6 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 bg-primary-100 flex items-center justify-center rounded-full">
-            <UserPlus className="h-5 w-5 text-primary" />
+            <img
+              src={APP_LOGO_URL}
+              alt="Optimized Solutions Ltd"
+              className="h-6 w-6 rounded-full bg-white object-contain"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
           <h2 className="mt-4 text-2xl font-extrabold text-gray-900">Register</h2>
           <p className="mt-1 text-xs text-gray-600">

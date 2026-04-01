@@ -15,6 +15,9 @@ import {
   IndianRupee
 } from 'lucide-react';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
 
@@ -142,7 +145,13 @@ const Dashboard = () => {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center space-x-3">
               <div className={`p-2 ${roleUi.brandBg} rounded-lg shadow-sm`}>
-                <LayoutDashboard className="h-6 w-6 text-white" />
+                <img
+                  src={APP_LOGO_URL}
+                  alt="Optimized Solutions Ltd"
+                  className="h-6 w-6 rounded bg-white object-contain"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <span className="text-xl font-bold text-gray-900 tracking-tight">Inventory Management</span>
             </div>

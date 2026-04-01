@@ -13,7 +13,9 @@ const router = express.Router();
 const canViewProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.PRESALE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.WAREHOUSE]);
 const canCreateProjects = roleMiddleware([ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 const canEditProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
-const canEditBom = roleMiddleware([ROLES.PRESALE, ROLES.PROJECT_MANAGER, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
+const canManageBom = roleMiddleware([ROLES.PRESALE, ROLES.ADMIN]);
+const canUpdateBom = roleMiddleware([ROLES.PRESALE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
+const canCreateBomChangeRequest = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 
 const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLowerCase();
 
@@ -712,7 +714,7 @@ router.get('/:projectId/bom', authMiddleware, attachUserProfileDepartment, canVi
   }
 });
 
-router.post('/:projectId/bom', authMiddleware, attachUserProfileDepartment, canEditBom, async (req, res) => {
+router.post('/:projectId/bom', authMiddleware, attachUserProfileDepartment, canManageBom, async (req, res) => {
   try {
     const project = await Project.findById(req.params.projectId);
     if (!project) return res.status(404).json({ message: 'Project not found' });
@@ -750,7 +752,7 @@ router.post('/:projectId/bom', authMiddleware, attachUserProfileDepartment, canE
   }
 });
 
-router.post('/:projectId/bom/bulk', authMiddleware, attachUserProfileDepartment, canEditBom, async (req, res) => {
+router.post('/:projectId/bom/bulk', authMiddleware, attachUserProfileDepartment, canManageBom, async (req, res) => {
   try {
     const project = await Project.findById(req.params.projectId);
     if (!project) return res.status(404).json({ message: 'Project not found' });
@@ -794,7 +796,7 @@ router.post('/:projectId/bom/bulk', authMiddleware, attachUserProfileDepartment,
   }
 });
 
-router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepartment, canEditBom, async (req, res) => {
+router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepartment, canUpdateBom, async (req, res) => {
   try {
     const project = await Project.findById(req.params.projectId);
     if (!project) return res.status(404).json({ message: 'Project not found' });
@@ -803,7 +805,16 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
     const bomItem = project.bomItems?.id?.(req.params.bomItemId);
     if (!bomItem) return res.status(404).json({ message: 'BOM item not found' });
 
-    const payload = req.body || {};
+    const rawPayload = req.body || {};
+    const payload = (() => {
+      if (req.user?.role !== ROLES.INVENTORY_MANAGER) return rawPayload;
+      const allowedKeys = new Set(['inventoryAssetId', 'inventorySku', 'inventoryItemName', 'plannedQty', 'leadTimeWeeks', 'remarks']);
+      const next = {};
+      for (const [k, v] of Object.entries(rawPayload)) {
+        if (allowedKeys.has(k)) next[k] = v;
+      }
+      return next;
+    })();
     const current = bomItem.toObject ? bomItem.toObject() : { ...bomItem };
     const normalized = buildBomItem({ ...current, ...payload });
 
@@ -902,7 +913,7 @@ router.get('/:projectId/bom-change-requests', authMiddleware, attachUserProfileD
   }
 });
 
-router.post('/:projectId/bom-change-requests', authMiddleware, attachUserProfileDepartment, canEditBom, async (req, res) => {
+router.post('/:projectId/bom-change-requests', authMiddleware, attachUserProfileDepartment, canCreateBomChangeRequest, async (req, res) => {
   try {
     const project = await Project.findById(req.params.projectId);
     if (!project) return res.status(404).json({ message: 'Project not found' });

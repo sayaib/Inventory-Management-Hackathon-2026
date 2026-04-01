@@ -25,6 +25,9 @@ import api from '../api/axios';
 import { ROLES } from '../constants/roles';
 import { ASSET_CATEGORIES, ASSET_LOCATIONS, DEPARTMENTS } from '../constants/assets';
 
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
+
 const WarehousePanel = () => {
   const { user } = useAuth();
   const location = useLocation();
@@ -303,9 +306,20 @@ const WarehousePanel = () => {
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         <header className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Inventory Operations</h1>
-            <p className="text-sm text-gray-600 mt-0.5">Manage stock movements or add new items.</p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary shadow-sm">
+              <img
+                src={APP_LOGO_URL}
+                alt="Optimized Solutions Ltd"
+                className="h-7 w-7 rounded bg-white object-contain"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl font-extrabold text-gray-900">Inventory Operations</h1>
+              <p className="text-sm text-gray-600 mt-0.5">Manage stock movements or add new items.</p>
+            </div>
           </div>
           <div className="bg-primary-100 px-3 py-1.5 rounded-full text-primary-700 font-medium text-xs flex items-center">
             <RefreshCcw className="h-3 w-3 mr-1.5" />
