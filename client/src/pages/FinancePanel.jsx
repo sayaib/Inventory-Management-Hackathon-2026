@@ -122,7 +122,7 @@ const FinancePanel = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-emerald-600 rounded-lg">
+              <div className="p-2 bg-primary rounded-lg">
                 <IndianRupee className="h-6 w-6 text-white" />
               </div>
               <span className="text-xl font-bold text-gray-900 tracking-tight">Finance</span>
@@ -131,14 +131,14 @@ const FinancePanel = () => {
               <div className="flex items-center space-x-2 text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
                 <UserIcon className="h-4 w-4" />
                 <span className="text-sm font-medium">{user?.username}</span>
-                <span className="text-[10px] px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-full uppercase font-bold tracking-wider">
+                <span className="text-[10px] px-2 py-0.5 bg-primary-100 text-primary-800 rounded-full uppercase font-bold tracking-wider">
                   {user?.role?.replace(/_/g, ' ')}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={logout}
-                className="flex items-center space-x-1.5 text-gray-500 hover:text-red-600 transition-all duration-200 font-medium text-sm"
+                className="flex items-center space-x-1.5 text-gray-500 hover:text-accent transition-all duration-200 font-medium text-sm"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Sign Out</span>
@@ -159,7 +159,7 @@ const FinancePanel = () => {
             type="button"
             onClick={() => setActiveTab('valuation')}
             className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'valuation' ? 'bg-white text-emerald-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
+              activeTab === 'valuation' ? 'bg-white text-primary-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
             }`}
           >
             <Calculator className="h-4 w-4" />
@@ -169,7 +169,7 @@ const FinancePanel = () => {
             type="button"
             onClick={() => setActiveTab('cost')}
             className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'cost' ? 'bg-white text-emerald-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
+              activeTab === 'cost' ? 'bg-white text-primary-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
             }`}
           >
             <BarChart3 className="h-4 w-4" />
@@ -179,7 +179,7 @@ const FinancePanel = () => {
             type="button"
             onClick={() => setActiveTab('wastage')}
             className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'wastage' ? 'bg-white text-emerald-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
+              activeTab === 'wastage' ? 'bg-white text-primary-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
             }`}
           >
             <TrendingDown className="h-4 w-4" />
@@ -198,7 +198,7 @@ const FinancePanel = () => {
                 <select
                   value={valuationDepartment}
                   onChange={(e) => { setValuationDepartment(e.target.value); setValuationPage(1); }}
-                  className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                 >
                   {departmentOptions.map((d) => (
                     <option key={d} value={d}>{d}</option>
@@ -210,13 +210,13 @@ const FinancePanel = () => {
                     value={valuationSearch}
                     onChange={(e) => { setValuationSearch(e.target.value); setValuationPage(1); }}
                     placeholder="Search SKU / Asset ID / Item"
-                    className="pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 w-full md:w-80"
+                    className="pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary w-full md:w-80"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={fetchValuation}
-                  className="px-4 py-2 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+                  className="px-4 py-2 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary-700 transition"
                 >
                   Refresh
                 </button>
@@ -291,7 +291,7 @@ const FinancePanel = () => {
                     value={costAssetIdOrSku}
                     onChange={(e) => setCostAssetIdOrSku(e.target.value)}
                     placeholder="e.g. ASSET-XXXX or SKU-XXXX"
-                    className="mt-1 w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="mt-1 w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -301,7 +301,7 @@ const FinancePanel = () => {
                       type="date"
                       value={costFrom}
                       onChange={(e) => setCostFrom(e.target.value)}
-                      className="mt-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="mt-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -310,13 +310,13 @@ const FinancePanel = () => {
                       type="date"
                       value={costTo}
                       onChange={(e) => setCostTo(e.target.value)}
-                      className="mt-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="mt-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={fetchCostHistory}
-                    className="h-10 self-end px-4 py-2 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+                    className="h-10 self-end px-4 py-2 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary-700 transition"
                   >
                     Search
                   </button>
@@ -396,7 +396,7 @@ const FinancePanel = () => {
                   <select
                     value={wastageDepartment}
                     onChange={(e) => setWastageDepartment(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                   >
                     {departmentOptions.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -406,18 +406,18 @@ const FinancePanel = () => {
                     type="date"
                     value={wastageFrom}
                     onChange={(e) => setWastageFrom(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                   />
                   <input
                     type="date"
                     value={wastageTo}
                     onChange={(e) => setWastageTo(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                   />
                   <button
                     type="button"
                     onClick={fetchWastage}
-                    className="px-4 py-2 text-sm font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+                    className="px-4 py-2 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary-700 transition"
                   >
                     Refresh
                   </button>

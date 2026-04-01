@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -14,7 +14,6 @@ import {
   Edit3,
   Layers,
   MapPin,
-  Tag,
   Briefcase,
   ShieldAlert,
   Activity,
@@ -24,7 +23,7 @@ import {
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import api from '../api/axios';
 import { ROLES } from '../constants/roles';
-import { ASSET_CATEGORIES, ASSET_LOCATIONS, DEPARTMENTS, DEPT_FIELDS } from '../constants/assets';
+import { ASSET_CATEGORIES, ASSET_LOCATIONS, DEPARTMENTS } from '../constants/assets';
 
 const WarehousePanel = () => {
   const { user } = useAuth();
@@ -308,7 +307,7 @@ const WarehousePanel = () => {
             <h1 className="text-2xl font-extrabold text-gray-900">Inventory Operations</h1>
             <p className="text-sm text-gray-600 mt-0.5">Manage stock movements or add new items.</p>
           </div>
-          <div className="bg-indigo-100 px-3 py-1.5 rounded-full text-indigo-700 font-medium text-xs flex items-center">
+          <div className="bg-primary-100 px-3 py-1.5 rounded-full text-primary-700 font-medium text-xs flex items-center">
             <RefreshCcw className="h-3 w-3 mr-1.5" />
             Real-time Sync Active
           </div>
@@ -319,7 +318,7 @@ const WarehousePanel = () => {
           <button 
             onClick={() => setActiveTab('movement')}
             className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'movement' ? 'bg-white text-indigo-600 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
+              activeTab === 'movement' ? 'bg-white text-primary shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
             }`}
           >
             <RefreshCcw className="h-4 w-4" />
@@ -328,7 +327,7 @@ const WarehousePanel = () => {
           <button 
             onClick={() => setActiveTab('history')}
             className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'history' ? 'bg-white text-indigo-600 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
+              activeTab === 'history' ? 'bg-white text-primary shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
             }`}
           >
             <Activity className="h-4 w-4" />
@@ -338,7 +337,7 @@ const WarehousePanel = () => {
             <button 
               onClick={() => setActiveTab('add')}
               className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-                activeTab === 'add' ? 'bg-white text-indigo-600 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
+                activeTab === 'add' ? 'bg-white text-primary shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
               }`}
             >
               <Plus className="h-4 w-4" />
@@ -356,7 +355,7 @@ const WarehousePanel = () => {
             </div>
           )}
           {success && (
-            <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-3 rounded-xl flex items-center text-sm font-bold animate-in slide-in-from-top-2">
+            <div className="bg-primary-50 border border-primary-100 text-primary-700 px-4 py-3 rounded-xl flex items-center text-sm font-bold animate-in slide-in-from-top-2">
               <RefreshCcw className="h-4 w-4 mr-2 flex-shrink-0 animate-spin-slow" />
               {success}
             </div>
@@ -379,7 +378,7 @@ const WarehousePanel = () => {
                       <input 
                         type="text"
                         placeholder="Search item..."
-                        className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
                         value={logSearch}
                         onChange={(e) => { setLogSearch(e.target.value); setLogPage(1); }}
                       />
@@ -389,7 +388,7 @@ const WarehousePanel = () => {
 
                 {logLoading ? (
                   <div className="flex justify-center py-20">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : logs.length === 0 ? (
                   <div className="text-center py-20 text-gray-400 italic">
@@ -415,14 +414,14 @@ const WarehousePanel = () => {
                               <div className="font-bold text-sm text-gray-900">{log.itemName}</div>
                               <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">{log.sku}</div>
                               {log.projectName && (
-                                <div className="text-[10px] text-indigo-600 font-bold uppercase tracking-tighter">
+                                <div className="text-[10px] text-primary font-bold uppercase tracking-tighter">
                                   {log.projectName}
                                 </div>
                               )}
                             </td>
                             <td className="py-3">
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                                log.type === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                                log.type === 'IN' ? 'bg-primary-50 text-primary' : 'bg-accent-50 text-accent'
                               }`}>
                                 {log.type}
                               </span>
@@ -445,7 +444,7 @@ const WarehousePanel = () => {
                         <button 
                           disabled={logPage === 1}
                           onClick={() => setLogPage(prev => Math.max(1, prev - 1))}
-                          className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-indigo-600 disabled:opacity-30"
+                          className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-primary disabled:opacity-30"
                         >
                           <ChevronDown className="h-4 w-4 rotate-90" />
                         </button>
@@ -453,7 +452,7 @@ const WarehousePanel = () => {
                         <button 
                           disabled={logPage === logTotalPages}
                           onClick={() => setLogPage(prev => Math.min(logTotalPages, prev + 1))}
-                          className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-indigo-600 disabled:opacity-30"
+                          className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-primary disabled:opacity-30"
                         >
                           <ChevronDown className="h-4 w-4 -rotate-90" />
                         </button>
@@ -470,7 +469,7 @@ const WarehousePanel = () => {
                     <button 
                       onClick={() => { setMovementType('IN'); setMovementReason('PURCHASE'); setMovementProjectId(''); }}
                       className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${
-                        movementType === 'IN' ? 'bg-white text-emerald-600 shadow-sm font-bold' : 'text-gray-500 font-medium'
+                        movementType === 'IN' ? 'bg-white text-primary shadow-sm font-bold' : 'text-gray-500 font-medium'
                       }`}
                     >
                       <ArrowUpCircle className="h-4 w-4 mr-1.5" />
@@ -479,7 +478,7 @@ const WarehousePanel = () => {
                     <button 
                       onClick={() => { setMovementType('OUT'); setMovementReason('CONSUMPTION'); }}
                       className={`flex-1 flex items-center justify-center py-2 rounded-lg transition-all ${
-                        movementType === 'OUT' ? 'bg-white text-red-600 shadow-sm font-bold' : 'text-gray-500 font-medium'
+                        movementType === 'OUT' ? 'bg-white text-accent shadow-sm font-bold' : 'text-gray-500 font-medium'
                       }`}
                     >
                       <ArrowDownCircle className="h-4 w-4 mr-1.5" />
@@ -491,7 +490,7 @@ const WarehousePanel = () => {
                     <div className="space-y-4">
                       <button 
                         onClick={() => setIsScanning(true)}
-                        className="w-full py-8 border-2 border-dashed border-indigo-100 rounded-xl flex flex-col items-center justify-center text-indigo-600 hover:bg-indigo-50 transition-all group"
+                        className="w-full py-8 border-2 border-dashed border-primary-100 rounded-xl flex flex-col items-center justify-center text-primary hover:bg-primary-50 transition-all group"
                       >
                         <QrCode className="h-8 w-8 mb-2 group-hover:scale-110 transition-transform" />
                         <span className="font-bold text-sm">Scan QR / Barcode</span>
@@ -508,12 +507,12 @@ const WarehousePanel = () => {
                         <div>
                           <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">Item SKU or Asset ID</label>
                           <div className="relative group">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400 group-focus-within:text-primary transition-colors" />
                             <input 
                               type="text"
                               required
                               placeholder="Type or Scan ID..."
-                              className="w-full pl-10 pr-12 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-medium"
+                              className="w-full pl-10 pr-12 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none font-medium"
                               value={manualSku}
                               onChange={(e) => setManualSku(e.target.value)}
                             />
@@ -543,7 +542,7 @@ const WarehousePanel = () => {
                               type="number"
                               required
                               min="1"
-                              className="flex-1 py-3 text-base bg-gray-50 border border-gray-200 rounded-xl text-center font-extrabold focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                              className="flex-1 py-3 text-base bg-gray-50 border border-gray-200 rounded-xl text-center font-extrabold focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                               value={quantity}
                               onChange={(e) => setQuantity(Number(e.target.value))}
                             />
@@ -562,7 +561,7 @@ const WarehousePanel = () => {
                           <select
                             value={movementReason}
                             onChange={(e) => { setMovementReason(e.target.value); if (e.target.value !== 'CONSUMPTION') setMovementProjectId(''); }}
-                            className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                            className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none font-bold"
                           >
                             {movementType === 'IN' ? (
                               <>
@@ -594,7 +593,7 @@ const WarehousePanel = () => {
                                 placeholder="Optional"
                                 value={movementUnitCost}
                                 onChange={(e) => setMovementUnitCost(e.target.value)}
-                                className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                                className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none font-bold"
                               />
                             </div>
                             <div>
@@ -604,7 +603,7 @@ const WarehousePanel = () => {
                                 placeholder="Invoice / GRN (Optional)"
                                 value={movementReference}
                                 onChange={(e) => setMovementReference(e.target.value)}
-                                className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                                className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none font-bold"
                               />
                             </div>
                           </div>
@@ -617,7 +616,7 @@ const WarehousePanel = () => {
                               required={movementReason === 'CONSUMPTION'}
                               value={movementProjectId}
                               onChange={(e) => setMovementProjectId(e.target.value)}
-                              className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                              className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none font-bold"
                             >
                               <option value="">{projectsLoading ? 'Loading projects…' : 'Select project (required for consumption)'}</option>
                               {projects.map((p) => (
@@ -636,7 +635,7 @@ const WarehousePanel = () => {
                             placeholder="Optional"
                             value={movementNotes}
                             onChange={(e) => setMovementNotes(e.target.value)}
-                            className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none font-bold"
+                            className="w-full px-3 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none font-bold"
                           />
                         </div>
 
@@ -645,8 +644,8 @@ const WarehousePanel = () => {
                           disabled={loading || !manualSku || (movementType === 'OUT' && movementReason === 'CONSUMPTION' && !movementProjectId)}
                           className={`w-full py-4 rounded-2xl text-white font-black text-lg shadow-lg transform transition-all active:scale-95 flex items-center justify-center space-x-2 ${
                             movementType === 'IN' 
-                              ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100' 
-                              : 'bg-red-600 hover:bg-red-700 shadow-red-100'
+                              ? 'bg-primary hover:bg-primary-700 shadow-primary/10' 
+                              : 'bg-accent hover:bg-accent-700 shadow-accent/10'
                           } disabled:opacity-50 disabled:scale-100`}
                         >
                           {loading ? (
@@ -662,7 +661,7 @@ const WarehousePanel = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div id="reader" className="overflow-hidden rounded-xl border-2 border-indigo-50"></div>
+                      <div id="reader" className="overflow-hidden rounded-xl border-2 border-primary-50"></div>
                       <button 
                         onClick={() => setIsScanning(false)}
                         className="w-full py-2 bg-gray-100 text-gray-600 font-bold rounded-lg hover:bg-gray-200 transition-colors text-sm"
@@ -682,7 +681,7 @@ const WarehousePanel = () => {
                         <input 
                           type="text"
                           required
-                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                           value={newAsset.itemName}
                           onChange={(e) => setNewAsset({...newAsset, itemName: e.target.value})}
                           placeholder="e.g. Cisco Router A100"
@@ -695,7 +694,7 @@ const WarehousePanel = () => {
                       <div className="relative">
                         <Layers className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                         <select 
-                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none appearance-none"
+                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none appearance-none"
                           value={newAsset.category}
                           onChange={(e) => setNewAsset({...newAsset, category: e.target.value})}
                         >
@@ -709,7 +708,7 @@ const WarehousePanel = () => {
                       <div className="relative">
                         <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                         <select 
-                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none appearance-none"
+                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none appearance-none"
                           value={newAsset.location}
                           onChange={(e) => setNewAsset({...newAsset, location: e.target.value})}
                         >
@@ -723,7 +722,7 @@ const WarehousePanel = () => {
                       <div className="relative">
                         <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                         <select 
-                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none appearance-none"
+                          className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none appearance-none"
                           value={newAsset.department}
                           onChange={(e) => setNewAsset({...newAsset, department: e.target.value})}
                         >
@@ -737,8 +736,7 @@ const WarehousePanel = () => {
                       <input 
                         type="number"
                         required
-                        min="1"
-                        className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                        className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                         value={newAsset.totalQuantity}
                         onChange={(e) => setNewAsset({...newAsset, totalQuantity: Number(e.target.value)})}
                       />
@@ -748,7 +746,7 @@ const WarehousePanel = () => {
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">Cost</label>
                       <input 
                         type="number"
-                        className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                        className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                         value={newAsset.purchaseCost}
                         onChange={(e) => setNewAsset({...newAsset, purchaseCost: Number(e.target.value)})}
                       />
@@ -758,7 +756,7 @@ const WarehousePanel = () => {
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">Low Stock Threshold</label>
                       <input 
                         type="number"
-                        className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none"
+                        className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary focus:bg-white transition-all outline-none"
                         value={newAsset.lowStockThreshold}
                         onChange={(e) => setNewAsset({...newAsset, lowStockThreshold: Number(e.target.value)})}
                       />
@@ -768,7 +766,7 @@ const WarehousePanel = () => {
                       <button 
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 text-sm"
+                        className="w-full py-3 bg-primary hover:bg-primary-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 text-sm"
                       >
                         {loading ? 'Adding Asset...' : 'Add Asset to Inventory'}
                       </button>
@@ -784,7 +782,7 @@ const WarehousePanel = () => {
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit lg:sticky lg:top-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-gray-900 flex items-center">
-                <Package className="h-4 w-4 text-indigo-600 mr-2" />
+                <Package className="h-4 w-4 text-primary mr-2" />
                 Current Stock
               </h2>
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{inventory.length} Items</span>
@@ -799,7 +797,7 @@ const WarehousePanel = () => {
                 inventory.map((item) => (
                   <div key={item._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all border border-transparent hover:border-gray-200 group">
                     <div className="flex items-center space-x-3">
-                      <div className="h-9 w-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-indigo-600 border border-gray-100 text-xs">
+                      <div className="h-9 w-9 bg-white rounded-lg shadow-sm flex items-center justify-center font-bold text-primary border border-gray-100 text-xs">
                         {item.itemName?.charAt(0) || 'P'}
                       </div>
                       <div className="min-w-0">
@@ -808,7 +806,7 @@ const WarehousePanel = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`text-xs font-black ${item.availableQuantity <= (item.lowStockThreshold || 5) ? 'text-red-600 animate-pulse flex items-center justify-end' : 'text-indigo-600'}`}>
+                      <p className={`text-xs font-black ${item.availableQuantity <= (item.lowStockThreshold || 5) ? 'text-red-600 animate-pulse flex items-center justify-end' : 'text-primary'}`}>
                         {item.availableQuantity <= (item.lowStockThreshold || 5) && <ShieldAlert className="h-3 w-3 mr-1" />}
                         {item.availableQuantity}
                       </p>
@@ -827,7 +825,7 @@ const WarehousePanel = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className={`p-2 rounded-lg ${confirmUpdate.type === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              <div className={`p-2 rounded-lg ${confirmUpdate.type === 'IN' ? 'bg-primary-50 text-primary' : 'bg-accent-50 text-accent'}`}>
                 {confirmUpdate.type === 'IN' ? <ArrowUpCircle className="h-6 w-6" /> : <ArrowDownCircle className="h-6 w-6" />}
               </div>
               <h3 className="text-lg font-bold text-gray-900">Confirm Stock {confirmUpdate.type === 'IN' ? 'In' : 'Out'}</h3>
@@ -848,13 +846,13 @@ const WarehousePanel = () => {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 font-medium">Movement:</span>
-                <span className={`font-bold ${confirmUpdate.type === 'IN' ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`font-bold ${confirmUpdate.type === 'IN' ? 'text-primary' : 'text-accent'}`}>
                   {confirmUpdate.type === 'IN' ? '+' : '-'}{confirmUpdate.quantity} {confirmUpdate.asset.unit}
                 </span>
               </div>
               <div className="flex justify-between text-xs border-t border-gray-100 pt-2">
                 <span className="text-gray-500 font-medium">Final Stock:</span>
-                <span className="text-indigo-600 font-black">
+                <span className="text-primary font-black">
                   {confirmUpdate.type === 'IN' ? confirmUpdate.asset.availableQuantity + confirmUpdate.quantity : confirmUpdate.asset.availableQuantity - confirmUpdate.quantity} {confirmUpdate.asset.unit}
                 </span>
               </div>
@@ -871,7 +869,7 @@ const WarehousePanel = () => {
                 onClick={performStockUpdate}
                 disabled={loading}
                 className={`py-2.5 text-white font-bold rounded-xl transition-all text-sm shadow-md ${
-                  confirmUpdate.type === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                  confirmUpdate.type === 'IN' ? 'bg-primary hover:bg-primary-700' : 'bg-accent hover:bg-accent-700'
                 } disabled:opacity-50`}
               >
                 {loading ? 'Processing...' : 'Confirm'}

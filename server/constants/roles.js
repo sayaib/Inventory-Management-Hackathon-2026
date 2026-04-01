@@ -3,6 +3,8 @@ const ROLES = {
   INVENTORY_MANAGER: 'inventory_manager',
   PROCUREMENT: 'procurement',
   PROJECT_MANAGER: 'project_manager',
+  SALES_HEAD: 'sales_head',
+  PRESALE: 'presale',
   WAREHOUSE: 'warehouse',
   FINANCE: 'finance'
 };
@@ -30,6 +32,16 @@ const FEATURES = {
     'See allocated materials per project',
     'Track usage vs planned',
     'Detect overconsumption'
+  ],
+  [ROLES.SALES_HEAD]: [
+    'Create projects (IWO-based)',
+    'Capture project department',
+    'Add project descriptions'
+  ],
+  [ROLES.PRESALE]: [
+    'BOM dashboard',
+    'View projects by department',
+    'Prepare BOM requirements'
   ],
   [ROLES.WAREHOUSE]: [
     'Scan items (QR/barcode)',

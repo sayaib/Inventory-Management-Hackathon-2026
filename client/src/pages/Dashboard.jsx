@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Boxes,
   Briefcase,
+  ClipboardList,
   IndianRupee
 } from 'lucide-react';
 
@@ -24,120 +25,111 @@ const Dashboard = () => {
   const isAdmin = user?.role === ROLES.ADMIN;
   const isWarehouse = user?.role === ROLES.WAREHOUSE;
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
+  const isSalesHead = user?.role === ROLES.SALES_HEAD;
+  const isPresale = user?.role === ROLES.PRESALE;
   const isFinance = user?.role === ROLES.FINANCE;
   const isProcurement = user?.role === ROLES.PROCUREMENT;
 
   const roleUi = (() => {
+    const base = {
+      pageBg: 'bg-gradient-to-b from-primary-50 via-white to-muted-50',
+      brandBg: 'bg-primary',
+      badge: 'bg-primary-100 text-primary-800',
+      linkHover: 'hover:text-primary-700',
+      heroBorder: 'border-primary-200',
+      heroAccent: 'text-primary-700',
+      heroIconBg: 'bg-primary/10 text-primary-700',
+      layout: 'stack',
+      actionsTitle: 'Inventory Management Actions',
+      actionsIconClass: 'text-primary-700',
+      primaryAction: 'bg-primary text-white hover:bg-primary-700 shadow-md shadow-primary/10',
+      secondaryAction: 'bg-white text-primary border border-primary-200 hover:bg-primary-50 shadow-sm'
+    };
+
     if (isWarehouse) {
       return {
-        pageBg: 'bg-gradient-to-b from-amber-50 via-white to-orange-50',
-        brandBg: 'bg-amber-600',
-        badge: 'bg-amber-100 text-amber-900',
-        linkHover: 'hover:text-amber-700',
-        heroBorder: 'border-amber-200',
-        heroAccent: 'text-amber-700',
-        heroIconBg: 'bg-amber-600/10 text-amber-700',
+        ...base,
+        pageBg: 'bg-gradient-to-b from-accent-50 via-white to-muted-50',
+        brandBg: 'bg-accent',
+        badge: 'bg-accent-100 text-accent-800',
+        linkHover: 'hover:text-accent-700',
+        heroBorder: 'border-accent-200',
+        heroAccent: 'text-accent-700',
+        heroIconBg: 'bg-accent/10 text-accent-700',
         heroTitle: 'Warehouse Operations',
         heroSubtitle: "Scan, update, and sync stock movement with minimal clicks.",
         layout: 'split',
         actionsTitle: 'Shift Tools',
-        actionsIconClass: 'text-amber-700',
-        primaryAction: 'bg-amber-600 text-white hover:bg-amber-700 shadow-md shadow-amber-100',
-        secondaryAction: 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50 shadow-sm'
+        actionsIconClass: 'text-accent-700',
+        primaryAction: 'bg-accent text-white hover:bg-accent-700 shadow-md shadow-accent/10',
+        secondaryAction: 'bg-white text-accent-700 border border-accent-200 hover:bg-accent-50 shadow-sm'
       };
     }
 
     if (isFinance) {
       return {
-        pageBg: 'bg-gradient-to-b from-emerald-50 via-white to-slate-50',
-        brandBg: 'bg-emerald-600',
-        badge: 'bg-emerald-100 text-emerald-900',
-        linkHover: 'hover:text-emerald-700',
-        heroBorder: 'border-emerald-200',
-        heroAccent: 'text-emerald-700',
-        heroIconBg: 'bg-emerald-600/10 text-emerald-700',
+        ...base,
+        pageBg: 'bg-gradient-to-b from-muted-50 via-white to-primary-50',
+        brandBg: 'bg-muted',
+        badge: 'bg-muted-100 text-muted-800',
+        linkHover: 'hover:text-muted-800',
+        heroBorder: 'border-muted-200',
+        heroAccent: 'text-muted-800',
+        heroIconBg: 'bg-muted/10 text-muted-800',
         heroTitle: 'Finance Dashboard',
         heroSubtitle: 'Track valuation, costs, and wastage signals tied to inventory.',
         layout: 'stack',
         actionsTitle: 'Finance Shortcuts',
-        actionsIconClass: 'text-emerald-700',
-        primaryAction: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-100',
-        secondaryAction: 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 shadow-sm'
+        actionsIconClass: 'text-muted-800',
+        primaryAction: 'bg-primary text-white hover:bg-primary-700 shadow-md shadow-primary/10',
+        secondaryAction: 'bg-white text-primary border border-primary-200 hover:bg-primary-50 shadow-sm'
       };
     }
 
     if (isProjectManager) {
       return {
-        pageBg: 'bg-gradient-to-b from-indigo-50 via-white to-purple-50',
-        brandBg: 'bg-indigo-600',
-        badge: 'bg-indigo-100 text-indigo-900',
-        linkHover: 'hover:text-indigo-700',
-        heroBorder: 'border-indigo-200',
-        heroAccent: 'text-indigo-700',
-        heroIconBg: 'bg-indigo-600/10 text-indigo-700',
+        ...base,
         heroTitle: 'Project Materials Hub',
         heroSubtitle: 'Keep project allocations on track and surface overconsumption early.',
         layout: 'split',
         actionsTitle: 'Project Shortcuts',
-        actionsIconClass: 'text-indigo-700',
-        primaryAction: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100',
-        secondaryAction: 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 shadow-sm'
+        actionsIconClass: 'text-primary-700',
+        primaryAction: 'bg-primary text-white hover:bg-primary-700 shadow-md shadow-primary/10',
+        secondaryAction: 'bg-white text-primary border border-primary-200 hover:bg-primary-50 shadow-sm'
       };
     }
 
     if (isInventoryManager) {
       return {
-        pageBg: 'bg-gradient-to-b from-slate-50 via-white to-blue-50',
-        brandBg: 'bg-blue-600',
-        badge: 'bg-blue-100 text-blue-900',
-        linkHover: 'hover:text-blue-700',
-        heroBorder: 'border-blue-200',
-        heroAccent: 'text-blue-700',
-        heroIconBg: 'bg-blue-600/10 text-blue-700',
+        ...base,
         heroTitle: 'Inventory Command Center',
         heroSubtitle: 'Monitor stock health, consumption, and safety thresholds.',
         layout: 'cards',
         actionsTitle: 'Inventory Actions',
-        actionsIconClass: 'text-blue-700',
-        primaryAction: 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-100',
-        secondaryAction: 'bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 shadow-sm'
+        actionsIconClass: 'text-primary-700',
+        primaryAction: 'bg-primary text-white hover:bg-primary-700 shadow-md shadow-primary/10',
+        secondaryAction: 'bg-white text-primary border border-primary-200 hover:bg-primary-50 shadow-sm'
       };
     }
 
     if (isProcurement) {
       return {
-        pageBg: 'bg-gradient-to-b from-teal-50 via-white to-cyan-50',
-        brandBg: 'bg-teal-600',
-        badge: 'bg-teal-100 text-teal-900',
-        linkHover: 'hover:text-teal-700',
-        heroBorder: 'border-teal-200',
-        heroAccent: 'text-teal-700',
-        heroIconBg: 'bg-teal-600/10 text-teal-700',
+        ...base,
         heroTitle: 'Procurement Workspace',
         heroSubtitle: 'Review inventory signals and prepare purchasing decisions.',
         layout: 'split',
         actionsTitle: 'Procurement Actions',
-        actionsIconClass: 'text-teal-700',
-        primaryAction: 'bg-teal-600 text-white hover:bg-teal-700 shadow-md shadow-teal-100',
-        secondaryAction: 'bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 shadow-sm'
+        actionsIconClass: 'text-primary-700',
+        primaryAction: 'bg-primary text-white hover:bg-primary-700 shadow-md shadow-primary/10',
+        secondaryAction: 'bg-white text-primary border border-primary-200 hover:bg-primary-50 shadow-sm'
       };
     }
 
     return {
-      pageBg: 'bg-gray-50',
-      brandBg: 'bg-indigo-600',
-      badge: 'bg-indigo-200 text-indigo-900',
-      linkHover: 'hover:text-indigo-700',
-      heroBorder: 'border-indigo-200',
-      heroAccent: 'text-indigo-700',
-      heroIconBg: 'bg-indigo-600/10 text-indigo-700',
+      ...base,
       heroTitle: 'Dashboard',
       heroSubtitle: "Welcome back. Here's what's happening with your inventory today.",
-      layout: 'stack',
-      actionsTitle: 'Inventory Management Actions',
-      actionsIconClass: 'text-indigo-600',
-      primaryAction: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100',
-      secondaryAction: 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50 shadow-sm'
+      layout: 'stack'
     };
   })();
 
@@ -171,7 +163,7 @@ const Dashboard = () => {
               </Link>
               <button
                 onClick={logout}
-                className="flex items-center space-x-1.5 text-gray-500 hover:text-red-600 transition-all duration-200 font-medium text-sm"
+                className="flex items-center space-x-1.5 text-gray-500 hover:text-accent transition-all duration-200 font-medium text-sm"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Sign Out</span>
@@ -188,6 +180,8 @@ const Dashboard = () => {
               <div className={`p-3 rounded-xl ${roleUi.heroIconBg}`}>
                 {isFinance ? (
                   <IndianRupee className="h-6 w-6" />
+                ) : isPresale ? (
+                  <ClipboardList className="h-6 w-6" />
                 ) : isProjectManager ? (
                   <Briefcase className="h-6 w-6" />
                 ) : isWarehouse ? (
@@ -235,8 +229,8 @@ const Dashboard = () => {
                 className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <div className="p-3 bg-blue-600/10 rounded-xl w-fit group-hover:bg-blue-600/15 transition-colors">
-                    <Boxes className="h-6 w-6 text-blue-700" />
+                  <div className="p-3 bg-primary/10 rounded-xl w-fit group-hover:bg-primary/15 transition-colors">
+                    <Boxes className="h-6 w-6 text-primary-700" />
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Stock</span>
                 </div>
@@ -245,12 +239,26 @@ const Dashboard = () => {
               </Link>
 
               <Link
+                to="/inventory/submitted-bom"
+                className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="p-3 bg-primary/10 rounded-xl w-fit group-hover:bg-primary/15 transition-colors">
+                    <ClipboardList className="h-6 w-6 text-primary-700" />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">BOM</span>
+                </div>
+                <h3 className="mt-4 text-lg font-extrabold text-slate-900">Submitted BOM</h3>
+                <p className="text-sm text-slate-600 mt-1">View submitted BOMs grouped by department.</p>
+              </Link>
+
+              <Link
                 to="/warehouse?tab=history"
                 className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <div className="p-3 bg-emerald-600/10 rounded-xl w-fit group-hover:bg-emerald-600/15 transition-colors">
-                    <Activity className="h-6 w-6 text-emerald-700" />
+                  <div className="p-3 bg-muted/10 rounded-xl w-fit group-hover:bg-muted/15 transition-colors">
+                    <Activity className="h-6 w-6 text-muted-800" />
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Movement</span>
                 </div>
@@ -263,8 +271,8 @@ const Dashboard = () => {
                 className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <div className="p-3 bg-rose-600/10 rounded-xl w-fit group-hover:bg-rose-600/15 transition-colors">
-                    <AlertTriangle className="h-6 w-6 text-rose-700" />
+                  <div className="p-3 bg-accent/10 rounded-xl w-fit group-hover:bg-accent/15 transition-colors">
+                    <AlertTriangle className="h-6 w-6 text-accent-700" />
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Alerts</span>
                 </div>
@@ -275,29 +283,72 @@ const Dashboard = () => {
           </section>
         )}
 
-        {isProjectManager && (
+        {(isProjectManager || isSalesHead) && (
           <section className="mb-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Link
                 to="/projects"
-                className="lg:col-span-2 bg-white/80 backdrop-blur p-6 rounded-2xl border border-indigo-200 shadow-sm hover:shadow-md transition-all group overflow-hidden"
+                className="lg:col-span-2 bg-white/80 backdrop-blur p-6 rounded-2xl border border-primary-200 shadow-sm hover:shadow-md transition-all group overflow-hidden"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-indigo-600/10 text-indigo-700 group-hover:bg-indigo-600/15 transition-colors">
+                    <div className="p-3 rounded-xl bg-primary/10 text-primary-700 group-hover:bg-primary/15 transition-colors">
                       <Briefcase className="h-6 w-6" />
                     </div>
                     <div>
                       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Projects</div>
-                      <h3 className="mt-1 text-lg font-extrabold text-slate-900">Project Materials</h3>
-                      <p className="text-sm text-slate-600 mt-1">
-                        See allocations, track usage vs planned, and detect overconsumption.
-                      </p>
+                      <h3 className="mt-1 text-lg font-extrabold text-slate-900">Projects</h3>
+                      <p className="text-sm text-slate-600 mt-1">Create and view projects.</p>
                     </div>
                   </div>
-                  <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-indigo-700">
+                  <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-primary-700">
                     Open workspace
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary-700">
+                      <LayoutDashboard className="h-4 w-4" />
+                    </span>
+                  </div>
+                </div>
+              </Link>
+
+              <div className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+                  <Shield className={`h-4 w-4 ${roleUi.actionsIconClass}`} />
+                  What you can do
+                </div>
+                <div className="mt-3 space-y-2">
+                  {roleFeatures.slice(0, 4).map((f) => (
+                    <div key={f} className="flex items-start gap-2 text-sm text-slate-700">
+                      <span className={`mt-1 inline-flex h-2 w-2 shrink-0 rounded-full ${roleUi.brandBg}`} />
+                      <span>{f}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {isPresale && (
+          <section className="mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Link
+                to="/bom"
+                className="lg:col-span-2 bg-white/80 backdrop-blur p-6 rounded-2xl border border-primary-200 shadow-sm hover:shadow-md transition-all group overflow-hidden"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-primary/10 text-primary-700 group-hover:bg-primary/15 transition-colors">
+                      <ClipboardList className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">BOM</div>
+                      <h3 className="mt-1 text-lg font-extrabold text-slate-900">BOM Dashboard</h3>
+                      <p className="text-sm text-slate-600 mt-1">See projects department-wise for BOM.</p>
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-primary-700">
+                    Open dashboard
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary-700">
                       <LayoutDashboard className="h-4 w-4" />
                     </span>
                   </div>
@@ -327,11 +378,11 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Link
                 to="/finance"
-                className="lg:col-span-2 bg-white/80 backdrop-blur p-6 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-all group"
+                className="lg:col-span-2 bg-white/80 backdrop-blur p-6 rounded-2xl border border-muted-200 shadow-sm hover:shadow-md transition-all group"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-emerald-600/10 text-emerald-700 group-hover:bg-emerald-600/15 transition-colors">
+                    <div className="p-3 rounded-xl bg-muted/10 text-muted-800 group-hover:bg-muted/15 transition-colors">
                       <IndianRupee className="h-6 w-6" />
                     </div>
                     <div>
@@ -342,9 +393,9 @@ const Dashboard = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-emerald-700">
+                  <div className="hidden sm:flex items-center gap-2 text-xs font-bold text-muted-800">
                     View insights
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-muted/10 text-muted-800">
                       <LayoutDashboard className="h-4 w-4" />
                     </span>
                   </div>

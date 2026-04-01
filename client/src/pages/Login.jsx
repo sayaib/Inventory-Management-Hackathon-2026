@@ -44,17 +44,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.15),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(16,185,129,0.12),transparent_60%)]">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(23,62,119,0.16),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(198,34,34,0.12),transparent_60%)]">
       <div className="mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
         <div className="w-full">
           <div className="rounded-3xl bg-gradient-to-br from-slate-200/70 via-white to-slate-200/50 p-[1px] shadow-[0_18px_55px_-28px_rgba(2,6,23,0.45)]">
             <div className="relative overflow-hidden rounded-3xl bg-white">
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.10),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(2,6,23,0.04),transparent_58%)]" />
+              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,rgba(23,62,119,0.10),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(114,115,113,0.08),transparent_58%)]" />
               <div className="relative grid grid-cols-1 lg:grid-cols-2">
                 <div className="hidden lg:flex flex-col justify-between p-10">
                   <div>
                     <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-700">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white">
                         <LogIn className="h-4 w-4" />
                       </span>
                       Inventory Management Suite
@@ -68,19 +68,19 @@ const Login = () => {
                     </p>
                     <div className="mt-8 space-y-3">
                       <div className="flex items-center gap-3 text-sm text-slate-700">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary-700">
                           <Package className="h-4 w-4" />
                         </span>
                         Item-level tracking with clean audit history
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-700">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent-700">
                           <BarChart3 className="h-4 w-4" />
                         </span>
                         Live dashboards for inventory health
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-700">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900/10 text-slate-800">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-muted/10 text-muted-800">
                           <ShieldCheck className="h-4 w-4" />
                         </span>
                         Role-based access for safer operations
@@ -102,7 +102,7 @@ const Login = () => {
               <div className="mx-auto w-full max-w-md">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm shadow-indigo-600/20">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-sm shadow-primary/20">
                       <LogIn className="h-5 w-5" />
                     </div>
                     <div>
@@ -141,7 +141,7 @@ const Login = () => {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                         placeholder="name@company.com"
                       />
                     </div>
@@ -163,13 +163,13 @@ const Login = () => {
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 pr-12 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                        className="block w-full rounded-xl border border-slate-200 bg-white px-10 pr-12 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                         placeholder="Enter your password"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute inset-y-0 right-0 inline-flex items-center justify-center rounded-r-xl px-3 text-slate-500 transition hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+                        className="absolute inset-y-0 right-0 inline-flex items-center justify-center rounded-r-xl px-3 text-slate-500 transition hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-primary/20"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -185,7 +185,7 @@ const Login = () => {
                         type="checkbox"
                         checked={saveUser}
                         onChange={(e) => setSaveUser(e.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-4 focus:ring-indigo-600/20"
+                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-4 focus:ring-primary/20"
                       />
                       Save user on this device
                     </label>
@@ -194,7 +194,7 @@ const Login = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-600/25 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="group inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary/25 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {loading ? (
                       <>

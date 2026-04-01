@@ -100,7 +100,7 @@ const Profile = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -113,20 +113,20 @@ const Profile = () => {
             <div className="flex items-center gap-3">
               <Link
                 to="/dashboard"
-                className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-indigo-600"
+                className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Link>
               <div className="hidden sm:flex items-center gap-2 text-gray-900">
-                <div className="p-2 bg-indigo-600 rounded-lg">
+                <div className="p-2 bg-primary rounded-lg">
                   <UserIcon className="h-5 w-5 text-white" />
                 </div>
                 <span className="text-lg font-bold tracking-tight">Profile</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-[10px] px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full uppercase font-bold tracking-wider">
+              <div className="text-[10px] px-2.5 py-1 bg-primary-100 text-primary-800 rounded-full uppercase font-bold tracking-wider">
                 {role?.replace(/_/g, ' ')}
               </div>
             </div>
@@ -148,7 +148,7 @@ const Profile = () => {
                 <input
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                   placeholder="Username"
                   required
                 />
@@ -167,7 +167,7 @@ const Profile = () => {
                   name="firstName"
                   value={profile.firstName}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -176,7 +176,7 @@ const Profile = () => {
                   name="lastName"
                   value={profile.lastName}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -185,7 +185,7 @@ const Profile = () => {
                   name="phone"
                   value={profile.phone}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -194,7 +194,7 @@ const Profile = () => {
                   name="department"
                   value={profile.department}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -203,7 +203,7 @@ const Profile = () => {
                   name="jobTitle"
                   value={profile.jobTitle}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -212,7 +212,7 @@ const Profile = () => {
                   name="avatarUrl"
                   value={profile.avatarUrl}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                   placeholder="https://..."
                 />
               </div>
@@ -225,7 +225,7 @@ const Profile = () => {
                   name="addressLine1"
                   value={profile.addressLine1}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div className="md:col-span-2">
@@ -234,7 +234,7 @@ const Profile = () => {
                   name="addressLine2"
                   value={profile.addressLine2}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -243,7 +243,7 @@ const Profile = () => {
                   name="city"
                   value={profile.city}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -252,7 +252,7 @@ const Profile = () => {
                   name="state"
                   value={profile.state}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -261,7 +261,7 @@ const Profile = () => {
                   name="postalCode"
                   value={profile.postalCode}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div>
@@ -270,7 +270,7 @@ const Profile = () => {
                   name="country"
                   value={profile.country}
                   onChange={handleProfileChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
               <div className="md:col-span-2">
@@ -280,7 +280,7 @@ const Profile = () => {
                   value={profile.bio}
                   onChange={handleProfileChange}
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
                 />
               </div>
             </div>
@@ -288,7 +288,7 @@ const Profile = () => {
             <div className="flex items-center justify-between gap-4">
               <div className="text-sm">
                 {error && <p className="text-red-600 font-medium">{error}</p>}
-                {success && <p className="text-green-600 font-medium">{success}</p>}
+                {success && <p className="text-primary-700 font-medium">{success}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -303,7 +303,7 @@ const Profile = () => {
                 <button
                   type="submit"
                   disabled={saving || !canSubmit}
-                  className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-primary-700 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Save

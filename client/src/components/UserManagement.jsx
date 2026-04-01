@@ -63,11 +63,11 @@ const UserManagement = () => {
   };
 
   const rolePillClass = (role) => {
-    if (role === ROLES.ADMIN) return 'bg-indigo-50 text-indigo-800';
-    if (role === ROLES.WAREHOUSE) return 'bg-amber-50 text-amber-800';
-    if (role === ROLES.FINANCE) return 'bg-emerald-50 text-emerald-800';
-    if (role === ROLES.PROJECT_MANAGER) return 'bg-sky-50 text-sky-800';
-    return 'bg-slate-100 text-slate-700';
+    if (role === ROLES.ADMIN) return 'bg-primary-50 text-primary-800';
+    if (role === ROLES.WAREHOUSE) return 'bg-accent-50 text-accent-800';
+    if (role === ROLES.FINANCE) return 'bg-muted-50 text-muted-800';
+    if (role === ROLES.PROJECT_MANAGER) return 'bg-primary-50 text-primary-800';
+    return 'bg-muted-100 text-muted-800';
   };
 
   const filteredUsers = useMemo(() => {
@@ -178,11 +178,11 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-600 p-[1px] shadow-[0_18px_55px_-28px_rgba(2,6,23,0.45)]">
+      <div className="rounded-2xl bg-gradient-to-r from-primary via-primary-700 to-accent p-[1px] shadow-[0_18px_55px_-28px_rgba(2,6,23,0.45)]">
         <div className="rounded-2xl bg-white px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-600/10 text-indigo-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary-700">
                 <Shield className="h-5 w-5" />
               </div>
               <div>
@@ -218,7 +218,7 @@ const UserManagement = () => {
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
               <div className="flex items-center gap-2">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary-700">
                   <UserPlus className="h-4 w-4" />
                 </span>
                 <div>
@@ -244,7 +244,7 @@ const UserManagement = () => {
                     required
                     value={formData.username}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     placeholder="e.g. warehouse-admin"
                   />
                 </div>
@@ -265,7 +265,7 @@ const UserManagement = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -283,7 +283,7 @@ const UserManagement = () => {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     placeholder="Temporary password"
                   />
                 </div>
@@ -297,7 +297,7 @@ const UserManagement = () => {
                     name="role"
                     value={formData.role}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   >
                     {Object.entries(ROLES)
                       .filter(([, value]) => value !== ROLES.PROCUREMENT && value !== ROLES.ADMIN)
@@ -319,7 +319,7 @@ const UserManagement = () => {
                 <div
                   className={[
                     'rounded-xl border px-4 py-3 text-xs font-semibold',
-                    error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-primary-100 bg-primary-50 text-primary-800'
                   ].join(' ')}
                   role={error ? 'alert' : 'status'}
                   aria-live="polite"
@@ -331,7 +331,7 @@ const UserManagement = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 Create user
@@ -355,13 +355,13 @@ const UserManagement = () => {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search username or email…"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 sm:w-60"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15 sm:w-60"
                   />
                 </div>
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                 >
                   <option value="all">All roles</option>
                   {Object.entries(ROLES)
@@ -386,7 +386,7 @@ const UserManagement = () => {
               </div>
             )}
             {!tableError && success && (
-              <div className="border-b border-slate-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800" role="status">
+              <div className="border-b border-slate-200 bg-primary-50 px-4 py-3 text-xs font-semibold text-primary-800" role="status">
                 {success}
               </div>
             )}
@@ -405,7 +405,7 @@ const UserManagement = () => {
                   {loading ? (
                     <tr>
                       <td colSpan="4" className="px-4 py-12 text-center">
-                        <Loader2 className="animate-spin h-7 w-7 text-indigo-600 mx-auto" />
+                        <Loader2 className="animate-spin h-7 w-7 text-primary mx-auto" />
                       </td>
                     </tr>
                   ) : filteredUsers.length === 0 ? (
@@ -432,14 +432,14 @@ const UserManagement = () => {
                         <tr key={u._id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600/15 via-indigo-500/10 to-emerald-600/15 text-slate-800 font-extrabold">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-muted/15 text-slate-800 font-extrabold">
                                 {initials}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <div className="truncate font-extrabold text-slate-900">{u.username}</div>
                                   {isSelf && (
-                                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-indigo-800">
+                                    <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-primary-800">
                                       You
                                     </span>
                                   )}
@@ -467,7 +467,7 @@ const UserManagement = () => {
                                 type="button"
                                 onClick={() => openEdit(u)}
                                 disabled={busy}
-                                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 title="Edit user"
                               >
                                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
@@ -530,7 +530,7 @@ const UserManagement = () => {
                     type="text"
                     value={editForm.username}
                     onChange={(e) => setEditForm((p) => ({ ...p, username: e.target.value }))}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     required
                   />
                 </div>
@@ -544,7 +544,7 @@ const UserManagement = () => {
                     type="email"
                     value={editForm.email}
                     onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     required
                   />
                 </div>
@@ -560,7 +560,7 @@ const UserManagement = () => {
                     value={editForm.role}
                     onChange={(e) => setEditForm((p) => ({ ...p, role: e.target.value }))}
                     disabled={editUser.role === ROLES.ADMIN}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                   >
                     {editUser.role === ROLES.ADMIN && (
                       <option value={ROLES.ADMIN}>Admin</option>
@@ -589,7 +589,7 @@ const UserManagement = () => {
                     type="password"
                     value={editForm.password}
                     onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
                     placeholder="Leave blank to keep"
                   />
                 </div>
@@ -613,7 +613,7 @@ const UserManagement = () => {
                 <button
                   type="submit"
                   disabled={editSubmitting}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {editSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   Save changes

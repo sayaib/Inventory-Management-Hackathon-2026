@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History } from 'lucide-react';
+import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download } from 'lucide-react';
 import UserManagement from '../components/UserManagement';
 import AuditLog from '../components/AuditLog';
 import AdminProfile from '../components/AdminProfile';
@@ -31,6 +31,13 @@ const AdminPanel = () => {
   const [deptValue, setDeptValue] = useState([]);
   const purchasesRef = useRef(null);
   const [purchasesWidth, setPurchasesWidth] = useState(600);
+  const [projectStatusRows, setProjectStatusRows] = useState([]);
+  const [projectStatusLoading, setProjectStatusLoading] = useState(false);
+  const [projectStatusError, setProjectStatusError] = useState('');
+  const [projectStatusSearch, setProjectStatusSearch] = useState('');
+  const [projectStatusDept, setProjectStatusDept] = useState('all');
+  const [reportDept, setReportDept] = useState('all');
+  const [reportSearch, setReportSearch] = useState('');
 
   useEffect(() => {
     const el = purchasesRef.current;
@@ -116,21 +123,173 @@ const AdminPanel = () => {
     fetchStats();
   }, [startDate, endDate]);
 
+  const normalizeDepartment = (value) => {
+    const next = typeof value === 'string' ? value.trim() : '';
+    return next || 'Unassigned';
+  };
+
+  const formatRupees = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '₹0';
+    return `₹${Math.round((n + Number.EPSILON) * 100) / 100}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  const downloadCsv = (fileName, rows) => {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    if (safeRows.length === 0) return;
+    const headers = Object.keys(safeRows[0] || {});
+    const escapeCell = (v) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const lines = [
+      headers.map(escapeCell).join(','),
+      ...safeRows.map((r) => headers.map((h) => escapeCell(r?.[h])).join(','))
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const fetchProjectStatuses = async () => {
+    setProjectStatusLoading(true);
+    setProjectStatusError('');
+    try {
+      const res = await api.get('/projects/status/overview');
+      const rows = Array.isArray(res.data?.projects) ? res.data.projects : [];
+      setProjectStatusRows(rows);
+    } catch (err) {
+      setProjectStatusError(err.response?.data?.message || 'Failed to fetch project statuses');
+    } finally {
+      setProjectStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'projectStatus' && activeTab !== 'reports') return;
+    fetchProjectStatuses();
+  }, [activeTab]);
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleString();
+  };
+
   const navItems = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { key: 'projectStatus', label: 'Project Status', icon: FolderKanban },
     { key: 'users', label: 'Users', icon: Users },
     { key: 'profile', label: 'Profile', icon: UserIcon },
     { key: 'audit', label: 'Audit Logs', icon: History },
-    { key: 'reports', label: 'Reports', icon: BarChart3, disabled: true },
+    { key: 'reports', label: 'Reports', icon: BarChart3 },
     { key: 'settings', label: 'Settings', icon: Settings, disabled: true }
   ];
+
+  const deptQtyMap = (() => {
+    const map = new Map();
+    for (const row of deptQty || []) {
+      const key = normalizeDepartment(row?.department);
+      map.set(key, Number(row?.qty || 0));
+    }
+    return map;
+  })();
+
+  const deptValueMap = (() => {
+    const map = new Map();
+    for (const row of deptValue || []) {
+      const key = normalizeDepartment(row?.department);
+      map.set(key, Number(row?.value || 0));
+    }
+    return map;
+  })();
+
+  const deptProjectReport = (() => {
+    const map = new Map();
+    for (const p of projectStatusRows || []) {
+      const dept = normalizeDepartment(p?.department);
+      const current = map.get(dept) || {
+        department: dept,
+        projectCount: 0,
+        allocatedProjects: 0,
+        bomProjects: 0,
+        usedTotal: 0,
+        basisTotal: 0,
+        lastActivityAt: null
+      };
+      current.projectCount += 1;
+      if (p?.statuses?.inventoryAllocated?.value) current.allocatedProjects += 1;
+      if (p?.statuses?.bomCreated?.value) current.bomProjects += 1;
+      const used = Number(p?.statuses?.utilization?.usedTotal || 0);
+      const denom = Number(p?.statuses?.utilization?.denominator || 0);
+      if (Number.isFinite(used)) current.usedTotal += used;
+      if (Number.isFinite(denom)) current.basisTotal += denom;
+      const lastAt = p?.lastActivityAt ? new Date(p.lastActivityAt) : null;
+      if (lastAt && !Number.isNaN(lastAt.getTime())) {
+        if (!current.lastActivityAt || lastAt > current.lastActivityAt) current.lastActivityAt = lastAt;
+      }
+      map.set(dept, current);
+    }
+    const out = Array.from(map.values()).map((d) => {
+      const basisTotal = Math.round((Number(d.basisTotal || 0) + Number.EPSILON) * 100) / 100;
+      const usedTotal = Math.round((Number(d.usedTotal || 0) + Number.EPSILON) * 100) / 100;
+      const utilizationPercent =
+        basisTotal > 0 ? Math.round(((usedTotal / basisTotal) * 100 + Number.EPSILON) * 10) / 10 : 0;
+      const stockQty = Math.max(0, Number(deptQtyMap.get(d.department) || 0));
+      const stockValue = Math.max(0, Number(deptValueMap.get(d.department) || 0));
+      return {
+        ...d,
+        usedTotal,
+        basisTotal,
+        utilizationPercent,
+        stockQty,
+        stockValue,
+        lastActivityAt: d.lastActivityAt ? d.lastActivityAt.toISOString() : null
+      };
+    });
+    out.sort((a, b) => (b.stockValue || 0) - (a.stockValue || 0));
+    return out;
+  })();
+
+  const reportDepartments = (() => {
+    const set = new Set();
+    for (const d of deptProjectReport || []) set.add(d.department);
+    for (const d of deptQtyMap.keys()) set.add(d);
+    for (const d of deptValueMap.keys()) set.add(d);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  })();
+
+  const filteredDeptReport = (() => {
+    if (reportDept === 'all') return deptProjectReport;
+    return (deptProjectReport || []).filter((d) => d.department === reportDept);
+  })();
+
+  const filteredProjectDetails = (() => {
+    const q = reportSearch.trim().toLowerCase();
+    const list = (projectStatusRows || []).filter((p) => {
+      const dept = normalizeDepartment(p?.department);
+      if (reportDept !== 'all' && dept !== reportDept) return false;
+      if (!q) return true;
+      const hay = `${p?.code || ''} ${p?.name || ''} ${dept}`.toLowerCase();
+      return hay.includes(q);
+    });
+    list.sort((a, b) => String(a?.code || '').localeCompare(String(b?.code || '')));
+    return list;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100">
       <div className="flex min-h-screen w-full">
         <aside className="hidden w-60 shrink-0 border-r border-slate-800/40 bg-slate-950 text-slate-100 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
           <div className="flex items-center gap-3 px-4 py-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-white shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
               <Shield className="h-5 w-5" />
             </div>
             <div className="leading-tight">
@@ -144,7 +303,7 @@ const AdminPanel = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
-                const isDisabled = Boolean(item.disabled);
+                const isDisabled = item.disabled === true;
                 return (
                   <button
                     key={item.key}
@@ -153,7 +312,7 @@ const AdminPanel = () => {
                     onClick={() => setActiveTab(item.key)}
                     className={[
                       'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
-                      isActive ? 'bg-indigo-500/15 text-white' : 'text-slate-200 hover:bg-white/5 hover:text-white',
+                      isActive ? 'bg-primary/20 text-white' : 'text-slate-200 hover:bg-white/5 hover:text-white',
                       isDisabled ? 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-200' : ''
                     ].join(' ')}
                     aria-current={isActive ? 'page' : undefined}
@@ -193,7 +352,7 @@ const AdminPanel = () => {
             <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
               <div className="min-w-0">
                 <h1 className="truncate text-base font-extrabold text-slate-900">
-                  {activeTab === 'users' ? 'User Management' : activeTab === 'profile' ? 'Your Profile' : activeTab === 'audit' ? 'Audit Logs' : 'Overview'}
+                  {activeTab === 'users' ? 'User Management' : activeTab === 'profile' ? 'Your Profile' : activeTab === 'audit' ? 'Audit Logs' : activeTab === 'projectStatus' ? 'Project Status' : activeTab === 'reports' ? 'Reports' : 'Overview'}
                 </h1>
                 <p className="truncate text-xs text-slate-500">Admin controls for inventory operations</p>
               </div>
@@ -219,7 +378,7 @@ const AdminPanel = () => {
                   {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.key;
-                    const isDisabled = Boolean(item.disabled);
+                    const isDisabled = item.disabled === true;
                     return (
                       <button
                         key={item.key}
@@ -228,7 +387,7 @@ const AdminPanel = () => {
                         onClick={() => setActiveTab(item.key)}
                         className={[
                           'inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition',
-                          isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                          isActive ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
                           isDisabled ? 'cursor-not-allowed opacity-50' : ''
                         ].join(' ')}
                       >
@@ -245,7 +404,7 @@ const AdminPanel = () => {
           <div className="w-full px-4 py-4 sm:px-6">
             {activeTab === 'overview' && (
               <div className="space-y-5">
-                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-600 p-6 text-white shadow-sm">
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-primary via-primary-700 to-accent p-6 text-white shadow-sm">
                   <div className="relative z-10 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-xs font-bold uppercase tracking-wider text-white/80">Admin Overview</div>
@@ -254,7 +413,7 @@ const AdminPanel = () => {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold backdrop-blur">
-                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-300"></span>
+                        <span className="inline-block h-2 w-2 rounded-full bg-accent-200"></span>
                         {startDate} – {endDate}
                       </span>
                       <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-bold backdrop-blur">
@@ -270,7 +429,7 @@ const AdminPanel = () => {
                   <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-bold uppercase tracking-wide text-slate-600">Users</div>
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-600/10 text-indigo-700">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary-700">
                         <Users className="h-4 w-4" />
                       </span>
                     </div>
@@ -281,7 +440,7 @@ const AdminPanel = () => {
                   <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-bold uppercase tracking-wide text-slate-600">Inventory</div>
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-600/10 text-emerald-700">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary-700">
                         <Package className="h-4 w-4" />
                       </span>
                     </div>
@@ -330,7 +489,7 @@ const AdminPanel = () => {
                               }}
                               className={[
                                 'px-2 py-1 text-[11px] font-bold rounded-full',
-                                isActive ? 'bg-indigo-600 text-white' : 'text-slate-700 hover:bg-slate-100'
+                              isActive ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'
                               ].join(' ')}
                             >
                               {p.label}
@@ -342,7 +501,7 @@ const AdminPanel = () => {
                           onClick={() => setRangePreset('custom')}
                           className={[
                             'px-2 py-1 text-[11px] font-bold rounded-full',
-                            rangePreset === 'custom' ? 'bg-indigo-600 text-white' : 'text-slate-700 hover:bg-slate-100'
+                          rangePreset === 'custom' ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'
                           ].join(' ')}
                         >
                           Custom
@@ -458,7 +617,7 @@ const AdminPanel = () => {
                         <p className="text-xs text-slate-500">IN vs OUT within selected dates</p>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] font-bold">
-                        <span className="inline-flex items-center gap-1 text-indigo-700"><span className="h-2 w-2 rounded-full bg-indigo-600"></span> IN</span>
+                        <span className="inline-flex items-center gap-1 text-primary-700"><span className="h-2 w-2 rounded-full bg-primary"></span> IN</span>
                         <span className="inline-flex items-center gap-1 text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-600"></span> OUT</span>
                       </div>
                     </div>
@@ -546,7 +705,7 @@ const AdminPanel = () => {
                                   <div key={d.department} className="flex items-center gap-3">
                                     <div className="w-28 shrink-0 text-xs font-bold text-slate-700">{d.department}</div>
                                     <div className="flex-1 h-3 rounded-full bg-slate-100">
-                                      <div className="h-3 rounded-full bg-emerald-500" style={{ width: `${pct}%` }}></div>
+                                      <div className="h-3 rounded-full bg-primary" style={{ width: `${pct}%` }}></div>
                                     </div>
                                     <div className="w-16 shrink-0 text-right text-xs font-extrabold text-slate-700">{d.qty}</div>
                                   </div>
@@ -582,7 +741,7 @@ const AdminPanel = () => {
                                 <div key={d.department} className="flex items-center gap-3">
                                   <div className="w-28 shrink-0 text-xs font-bold text-slate-700">{d.department}</div>
                                   <div className="flex-1 h-3 rounded-full bg-slate-100">
-                                    <div className="h-3 rounded-full bg-indigo-500" style={{ width: `${pct}%` }}></div>
+                                    <div className="h-3 rounded-full bg-primary" style={{ width: `${pct}%` }}></div>
                                   </div>
                                   <div className="w-24 shrink-0 text-right text-xs font-extrabold text-slate-700">₹{Math.round(d.value).toLocaleString()}</div>
                                   <div className="w-10 shrink-0 text-right text-[11px] font-bold text-slate-500">{pct}%</div>
@@ -599,6 +758,163 @@ const AdminPanel = () => {
               </div>
             )}
 
+            {activeTab === 'projectStatus' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Current project status</h2>
+                      <p className="text-xs text-slate-500">Inventory allocated, BOM created, and utilization with date & time.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        value={projectStatusSearch}
+                        onChange={(e) => setProjectStatusSearch(e.target.value)}
+                        placeholder="Search by code/name/department…"
+                        className="h-9 w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      />
+                      <select
+                        value={projectStatusDept}
+                        onChange={(e) => setProjectStatusDept(e.target.value)}
+                        className="h-9 w-full sm:w-52 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      >
+                        {(() => {
+                          const depts = Array.from(
+                            new Set((projectStatusRows || []).map((p) => String(p?.department || '').trim()).filter(Boolean))
+                          ).sort((a, b) => a.localeCompare(b));
+                          return [
+                            <option key="all" value="all">All departments</option>,
+                            ...depts.map((d) => <option key={d} value={d}>{d}</option>)
+                          ];
+                        })()}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchProjectStatuses();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {projectStatusError && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                    {projectStatusError}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="border-b border-slate-200 px-4 py-3">
+                    <div className="text-xs font-bold text-slate-600">
+                      {projectStatusLoading ? 'Loading…' : `${projectStatusRows.length} projects`}
+                    </div>
+                  </div>
+                  <div className="w-full overflow-auto">
+                    {(() => {
+                      const q = projectStatusSearch.trim().toLowerCase();
+                      const rows = (projectStatusRows || []).filter((p) => {
+                        const dept = String(p?.department || '').trim();
+                        if (projectStatusDept !== 'all' && dept !== projectStatusDept) return false;
+                        if (!q) return true;
+                        const hay = `${p?.code || ''} ${p?.name || ''} ${dept}`.toLowerCase();
+                        return hay.includes(q);
+                      });
+
+                      const badge = (ok, label) => (
+                        <span
+                          className={[
+                            'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold',
+                            ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-50 text-slate-700 border border-slate-200'
+                          ].join(' ')}
+                        >
+                          {label}
+                        </span>
+                      );
+
+                      return (
+                        <table className="min-w-[1100px] w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr className="text-[11px] font-extrabold text-slate-700">
+                              <th className="px-4 py-3">Project</th>
+                              <th className="px-4 py-3">Department</th>
+                              <th className="px-4 py-3">Inventory allocated</th>
+                              <th className="px-4 py-3">BOM created</th>
+                              <th className="px-4 py-3">Utilization</th>
+                              <th className="px-4 py-3">Last activity</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {projectStatusLoading ? (
+                              <tr>
+                                <td className="px-4 py-4 text-slate-500" colSpan={6}>Loading…</td>
+                              </tr>
+                            ) : rows.length === 0 ? (
+                              <tr>
+                                <td className="px-4 py-4 text-slate-500" colSpan={6}>No projects found.</td>
+                              </tr>
+                            ) : (
+                              rows.map((p) => {
+                                const allocated = Boolean(p?.statuses?.inventoryAllocated?.value);
+                                const bom = Boolean(p?.statuses?.bomCreated?.value);
+                                const util = p?.statuses?.utilization || {};
+                                const utilBasis = util?.basis === 'allocated' ? 'Allocated' : util?.basis === 'planned' ? 'Planned' : '—';
+                                const utilDen = Number(util?.denominator || 0);
+                                const utilUsed = Number(util?.usedTotal || 0);
+                                const utilPct = Number(util?.percent || 0);
+                                return (
+                                  <tr key={p?.id || p?._id || p?.code} className="hover:bg-slate-50/70">
+                                    <td className="px-4 py-3">
+                                      <div className="font-extrabold text-slate-900">{p?.code || '-'}</div>
+                                      <div className="text-[11px] font-semibold text-slate-600">{p?.name || ''}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="text-[11px] font-extrabold text-slate-700">{p?.department || '-'}</div>
+                                      <div className="text-[11px] font-semibold text-slate-500">{String(p?.status || '').replace('_', ' ')}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex flex-col gap-1">
+                                        {badge(allocated, allocated ? 'Allocated' : 'Not allocated')}
+                                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.inventoryAllocated?.at)}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex flex-col gap-1">
+                                        {badge(bom, bom ? 'Created' : 'Not created')}
+                                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.bomCreated?.at)}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-extrabold text-slate-900">{utilDen > 0 ? `${utilPct}%` : '—'}</span>
+                                          <span className="text-[11px] font-bold text-slate-500">{utilBasis}</span>
+                                        </div>
+                                        <div className="text-[11px] font-semibold text-slate-600">
+                                          {utilDen > 0 ? `${utilUsed} / ${utilDen}` : 'No planned/allocated qty'}
+                                        </div>
+                                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(util?.at)}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">
+                                      {formatDateTime(p?.lastActivityAt)}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'users' && <UserManagement />}
 
             {activeTab === 'audit' && <AuditLog />}
@@ -606,8 +922,253 @@ const AdminPanel = () => {
             {activeTab === 'profile' && <AdminProfile />}
 
             {activeTab === 'reports' && (
-              <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-                Reports UI coming soon.
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Department-wise project inventory report</h2>
+                      <p className="text-xs text-slate-500">Projects utilization + current stock snapshot grouped by department.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        value={reportSearch}
+                        onChange={(e) => setReportSearch(e.target.value)}
+                        placeholder="Search projects by code/name…"
+                        className="h-9 w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      />
+                      <select
+                        value={reportDept}
+                        onChange={(e) => setReportDept(e.target.value)}
+                        className="h-9 w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      >
+                        <option value="all">All departments</option>
+                        {reportDepartments.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchProjectStatuses();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (filteredDeptReport || []).map((d) => ({
+                            Department: d.department,
+                            Projects: d.projectCount,
+                            'Projects Allocated': d.allocatedProjects,
+                            'Projects BOM': d.bomProjects,
+                            'Used Qty (total)': d.usedTotal,
+                            'Basis Qty (total)': d.basisTotal,
+                            'Utilization %': d.utilizationPercent,
+                            'Stock Qty (available)': d.stockQty,
+                            'Stock Value (snapshot)': Math.round((d.stockValue + Number.EPSILON) * 100) / 100,
+                            'Last Activity': d.lastActivityAt ? new Date(d.lastActivityAt).toLocaleString() : ''
+                          }));
+                          downloadCsv(`dept_project_inventory_${reportDept === 'all' ? 'all' : reportDept}.csv`, rows);
+                        }}
+                        className="h-9 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700"
+                      >
+                        <Download className="h-4 w-4" />
+                        Export CSV
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {projectStatusError && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+                    {projectStatusError}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="text-xs font-extrabold text-slate-700">Department summary</div>
+                    <div className="text-[11px] font-bold text-slate-500">
+                      {projectStatusLoading ? 'Loading…' : `${filteredDeptReport.length} departments`}
+                    </div>
+                  </div>
+                  <div className="w-full overflow-auto">
+                    <table className="min-w-[1100px] w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-[11px] font-extrabold text-slate-700">
+                          <th className="px-4 py-3">Department</th>
+                          <th className="px-4 py-3">Projects</th>
+                          <th className="px-4 py-3">Allocated</th>
+                          <th className="px-4 py-3">BOM</th>
+                          <th className="px-4 py-3">Used / Basis</th>
+                          <th className="px-4 py-3">Utilization</th>
+                          <th className="px-4 py-3">Stock qty</th>
+                          <th className="px-4 py-3">Stock value</th>
+                          <th className="px-4 py-3">Last activity</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {projectStatusLoading ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={9}>Loading…</td>
+                          </tr>
+                        ) : filteredDeptReport.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={9}>No departments found.</td>
+                          </tr>
+                        ) : (
+                          filteredDeptReport.map((d) => (
+                            <tr
+                              key={d.department}
+                              className="hover:bg-slate-50/70 cursor-pointer"
+                              onClick={() => setReportDept(d.department)}
+                            >
+                              <td className="px-4 py-3 font-extrabold text-slate-900">{d.department}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{d.projectCount}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{d.allocatedProjects}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{d.bomProjects}</td>
+                              <td className="px-4 py-3">
+                                <div className="text-[11px] font-extrabold text-slate-900">{d.basisTotal > 0 ? `${d.usedTotal} / ${d.basisTotal}` : '—'}</div>
+                                <div className="text-[11px] font-semibold text-slate-500">qty</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-[11px] font-extrabold text-slate-900">{d.basisTotal > 0 ? `${d.utilizationPercent}%` : '—'}</div>
+                                <div className="text-[11px] font-semibold text-slate-500">total</div>
+                              </td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{d.stockQty || 0}</td>
+                              <td className="px-4 py-3 font-bold text-slate-700">{formatRupees(d.stockValue || 0)}</td>
+                              <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">{formatDateTime(d.lastActivityAt)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="text-xs font-extrabold text-slate-700">Project details</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-[11px] font-bold text-slate-500">
+                        {projectStatusLoading ? 'Loading…' : `${filteredProjectDetails.length} projects`}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rows = (filteredProjectDetails || []).map((p) => {
+                            const dept = normalizeDepartment(p?.department);
+                            const util = p?.statuses?.utilization || {};
+                            const basis = util?.basis === 'allocated' ? 'Allocated' : util?.basis === 'planned' ? 'Planned' : '—';
+                            return {
+                              Department: dept,
+                              Code: p?.code || '',
+                              Name: p?.name || '',
+                              Status: p?.status || '',
+                              'Inventory Allocated': p?.statuses?.inventoryAllocated?.value ? 'Yes' : 'No',
+                              'BOM Created': p?.statuses?.bomCreated?.value ? 'Yes' : 'No',
+                              'Used Qty': Number(util?.usedTotal || 0),
+                              'Basis Type': basis,
+                              'Basis Qty': Number(util?.denominator || 0),
+                              'Utilization %': Number(util?.denominator || 0) > 0 ? Number(util?.percent || 0) : '',
+                              'Last Activity': p?.lastActivityAt ? new Date(p.lastActivityAt).toLocaleString() : ''
+                            };
+                          });
+                          downloadCsv(
+                            `project_inventory_details_${reportDept === 'all' ? 'all' : reportDept}.csv`,
+                            rows
+                          );
+                        }}
+                        className="h-8 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[11px] font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        <Download className="h-4 w-4" />
+                        Export
+                      </button>
+                    </div>
+                  </div>
+                  <div className="w-full overflow-auto">
+                    <table className="min-w-[1200px] w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr className="text-[11px] font-extrabold text-slate-700">
+                          <th className="px-4 py-3">Project</th>
+                          <th className="px-4 py-3">Department</th>
+                          <th className="px-4 py-3">Allocated</th>
+                          <th className="px-4 py-3">BOM</th>
+                          <th className="px-4 py-3">Used / Basis</th>
+                          <th className="px-4 py-3">Utilization</th>
+                          <th className="px-4 py-3">Last activity</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {projectStatusLoading ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={7}>Loading…</td>
+                          </tr>
+                        ) : filteredProjectDetails.length === 0 ? (
+                          <tr>
+                            <td className="px-4 py-4 text-slate-500" colSpan={7}>No projects found.</td>
+                          </tr>
+                        ) : (
+                          filteredProjectDetails.map((p) => {
+                            const allocated = !!p?.statuses?.inventoryAllocated?.value;
+                            const bom = !!p?.statuses?.bomCreated?.value;
+                            const util = p?.statuses?.utilization || {};
+                            const utilBasis = util?.basis === 'allocated' ? 'Allocated' : util?.basis === 'planned' ? 'Planned' : '—';
+                            const utilDen = Number(util?.denominator || 0);
+                            const utilUsed = Number(util?.usedTotal || 0);
+                            const utilPct = Number(util?.percent || 0);
+                            const badge = (ok, label) => (
+                              <span
+                                className={[
+                                  'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold',
+                                  ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-50 text-slate-700 border border-slate-200'
+                                ].join(' ')}
+                              >
+                                {label}
+                              </span>
+                            );
+                            return (
+                              <tr key={p?.id || p?._id || p?.code} className="hover:bg-slate-50/70">
+                                <td className="px-4 py-3">
+                                  <div className="font-extrabold text-slate-900">{p?.code || '-'}</div>
+                                  <div className="text-[11px] font-semibold text-slate-600">{p?.name || ''}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="text-[11px] font-extrabold text-slate-700">{normalizeDepartment(p?.department)}</div>
+                                  <div className="text-[11px] font-semibold text-slate-500">{String(p?.status || '').replace('_', ' ')}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col gap-1">
+                                    {badge(allocated, allocated ? 'Allocated' : 'Not allocated')}
+                                    <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.inventoryAllocated?.at)}</div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col gap-1">
+                                    {badge(bom, bom ? 'Created' : 'Not created')}
+                                    <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.bomCreated?.at)}</div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="text-[11px] font-extrabold text-slate-900">{utilDen > 0 ? `${utilUsed} / ${utilDen}` : '—'}</div>
+                                  <div className="text-[11px] font-semibold text-slate-500">{utilBasis}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="text-[11px] font-extrabold text-slate-900">{utilDen > 0 ? `${utilPct}%` : '—'}</div>
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">
+                                  {formatDateTime(p?.lastActivityAt)}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
 

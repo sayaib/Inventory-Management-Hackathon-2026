@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
 import api from '../api/axios';
@@ -271,22 +271,30 @@ const AssetManagement = () => {
                   setIsEditing(false);
                   setShowForm(!showForm);
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm ${showForm ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm ${showForm ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-primary text-white hover:bg-primary-700 shadow-primary/10'}`}
               >
                 {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                 {showForm ? 'Close Form' : 'Add Asset'}
               </button>
             )}
+            {(user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.ADMIN) && (
+              <Link
+                to="/inventory/submitted-bom"
+                className="px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-primary border border-primary-200 hover:bg-primary-50"
+              >
+                Submitted BOM
+              </Link>
+            )}
             <div className="flex bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
               <button 
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-indigo-50 text-indigo-600 shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-primary-50 text-primary shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
               >
                 <LayoutGrid className="h-4 w-4" />
               </button>
               <button 
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-indigo-50 text-indigo-600 shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-primary-50 text-primary shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
               >
                 <ListIcon className="h-4 w-4" />
               </button>
@@ -306,12 +314,12 @@ const AssetManagement = () => {
 
             <form onSubmit={handleSubmit} className="p-5 space-y-6">
               {/* Department Selection First */}
-              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100">
+              <div className="bg-primary-50/50 p-4 rounded-xl border border-primary-100">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest flex items-center">
+                  <h3 className="text-[10px] font-bold text-primary-700 uppercase tracking-widest flex items-center">
                     <ChevronRight className="h-3 w-3 mr-1.5" /> Select Department
                   </h3>
-                  {!selectedDept && <span className="text-[9px] bg-indigo-100 px-1.5 py-0.5 rounded text-indigo-600 font-bold uppercase tracking-tighter animate-pulse">Required</span>}
+                  {!selectedDept && <span className="text-[9px] bg-primary-100 px-1.5 py-0.5 rounded text-primary font-bold uppercase tracking-tighter animate-pulse">Required</span>}
                 </div>
                 <div className="flex flex-col md:flex-row md:items-center gap-4">
                   <select 
@@ -321,13 +329,13 @@ const AssetManagement = () => {
                       handleInputChange(e); 
                       setSelectedDept(e.target.value); 
                     }} 
-                    className="flex-1 px-3 py-2 bg-white border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-bold text-indigo-900 shadow-sm"
+                    className="flex-1 px-3 py-2 bg-white border border-primary-200 rounded-lg focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm font-bold text-primary-800 shadow-sm"
                   >
                     <option value="">-- Choose a Department --</option>
                     {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                   {selectedDept && (
-                    <div className="flex items-center text-emerald-600 font-bold text-xs">
+                    <div className="flex items-center text-primary font-bold text-xs">
                       <CheckCircle className="h-4 w-4 mr-1.5" />
                       Ready for {selectedDept}
                     </div>
@@ -341,21 +349,21 @@ const AssetManagement = () => {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Item Name</label>
-                      <input name="itemName" required value={formData.itemName} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input name="itemName" required value={formData.itemName} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">SKU Number</label>
-                      <input name="sku" placeholder="Auto-generated if empty" value={formData.sku} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input name="sku" placeholder="Auto-generated if empty" value={formData.sku} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Category</label>
-                      <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none">
                         {ASSET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Status</label>
-                      <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                      <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none">
                         {ASSET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
@@ -366,27 +374,27 @@ const AssetManagement = () => {
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Total</label>
-                        <input type="number" name="totalQuantity" value={formData.totalQuantity} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        <input type="number" name="totalQuantity" value={formData.totalQuantity} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Unit</label>
-                        <input name="unit" value={formData.unit} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        <input name="unit" value={formData.unit} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Threshold</label>
-                        <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
-                        <select name="location" value={formData.location} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <select name="location" value={formData.location} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none">
                           {ASSET_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Sub-Dept</label>
-                        <input name="subDepartment" value={formData.subDepartment} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        <input name="subDepartment" value={formData.subDepartment} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                       </div>
                     </div>
                   </div>
@@ -395,19 +403,19 @@ const AssetManagement = () => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cost</label>
-                      <input type="number" name="purchaseCost" value={formData.purchaseCost} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input type="number" name="purchaseCost" value={formData.purchaseCost} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Vendor</label>
-                      <input name="vendorName" value={formData.vendorName} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input name="vendorName" value={formData.vendorName} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Purchase Date</label>
-                      <input type="date" name="purchaseDate" value={formData.purchaseDate} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input type="date" name="purchaseDate" value={formData.purchaseDate} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Warranty</label>
-                      <input type="date" name="warrantyExpiry" value={formData.warrantyExpiry} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input type="date" name="warrantyExpiry" value={formData.warrantyExpiry} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                   </div>
 
@@ -422,11 +430,11 @@ const AssetManagement = () => {
                           <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">{field.label}</label>
                           {field.type === 'checkbox' ? (
                             <div className="flex items-center mt-2">
-                              <input type="checkbox" name={field.name} checked={formData.metadata[field.name] || false} onChange={handleMetadataChange} className="h-4 w-4 rounded text-indigo-600 border-gray-300" />
+                              <input type="checkbox" name={field.name} checked={formData.metadata[field.name] || false} onChange={handleMetadataChange} className="h-4 w-4 rounded text-primary border-gray-300" />
                               <span className="ml-2 text-xs text-gray-500">Enable</span>
                             </div>
                           ) : (
-                            <input type={field.type} name={field.name} value={formData.metadata[field.name] || ''} onChange={handleMetadataChange} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                            <input type={field.type} name={field.name} value={formData.metadata[field.name] || ''} onChange={handleMetadataChange} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                           )}
                         </div>
                       ))}
@@ -434,7 +442,7 @@ const AssetManagement = () => {
                   </div>
 
                   <div className="pt-4 flex gap-3">
-                    <button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-all transform active:scale-95">
+                    <button type="submit" className="flex-1 bg-primary hover:bg-primary-700 text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-all transform active:scale-95">
                       Save Asset
                     </button>
                     <button type="button" onClick={() => { setShowForm(false); setSelectedDept(''); }} className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-500 py-2.5 rounded-xl font-bold text-sm transition-all">
@@ -454,8 +462,8 @@ const AssetManagement = () => {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-indigo-200 transition-all duration-300">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-primary-200 transition-all duration-300">
+            <div className="p-3 bg-primary-50 text-primary rounded-xl group-hover:bg-primary group-hover:text-white transition-colors">
               <Package className="h-6 w-6" />
             </div>
             <div>
@@ -464,8 +472,8 @@ const AssetManagement = () => {
             </div>
           </div>
           
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-emerald-200 transition-all duration-300">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-muted-200 transition-all duration-300">
+            <div className="p-3 bg-muted-50 text-muted-800 rounded-xl group-hover:bg-muted group-hover:text-white transition-colors">
               <CheckCircle className="h-6 w-6" />
             </div>
             <div>
@@ -484,8 +492,8 @@ const AssetManagement = () => {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-indigo-200 transition-all duration-300">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-primary-200 transition-all duration-300">
+            <div className="p-3 bg-primary-50 text-primary rounded-xl group-hover:bg-primary group-hover:text-white transition-colors">
               <IndianRupee className="h-6 w-6" />
             </div>
             <div>
@@ -503,7 +511,7 @@ const AssetManagement = () => {
               <input 
                 type="text" 
                 placeholder="Search inventory..." 
-                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium transition-all"
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm font-medium transition-all"
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               />
@@ -511,7 +519,7 @@ const AssetManagement = () => {
             
             <div className="relative">
               <select 
-                className="w-full pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none appearance-none text-sm font-bold text-gray-600 cursor-pointer"
+                className="w-full pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none appearance-none text-sm font-bold text-gray-600 cursor-pointer"
                 value={filterDept}
                 onChange={(e) => { setFilterDept(e.target.value); setCurrentPage(1); }}
               >
@@ -558,7 +566,7 @@ const AssetManagement = () => {
         {/* Asset Grid/List */}
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : (
           <>
@@ -570,9 +578,9 @@ const AssetManagement = () => {
                 </div>
               ) : (
                 assets.map(asset => (
-                  <div key={asset._id} className={`bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all duration-300 ${viewMode === 'grid' ? 'rounded-2xl p-5' : 'rounded-xl p-3 flex items-center justify-between gap-4'}`}>
+                  <div key={asset._id} className={`bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-100 transition-all duration-300 ${viewMode === 'grid' ? 'rounded-2xl p-5' : 'rounded-xl p-3 flex items-center justify-between gap-4'}`}>
                     <div className="flex items-center space-x-4 flex-1 min-w-0">
-                      <div className={`p-2.5 rounded-xl flex-shrink-0 ${asset.availableQuantity <= (asset.lowStockThreshold || 5) ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                      <div className={`p-2.5 rounded-xl flex-shrink-0 ${asset.availableQuantity <= (asset.lowStockThreshold || 5) ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary'}`}>
                         <Package className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -593,8 +601,8 @@ const AssetManagement = () => {
                       
                       <div className="flex items-center">
                         <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-tight ${
-                          asset.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 
-                          asset.status === 'damaged' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                          asset.status === 'active' ? 'bg-primary-50 text-primary-700' : 
+                          asset.status === 'damaged' ? 'bg-accent-50 text-accent-700' : 'bg-muted-50 text-muted-800'
                         }`}>
                           {asset.status}
                         </span>
@@ -616,14 +624,14 @@ const AssetManagement = () => {
                           <button 
                             onClick={() => setViewAsset(asset)}
                             title="View Details"
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-all"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button 
                             onClick={() => setBarcodeAsset(asset)}
                             title="View Barcode"
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-all"
                           >
                             <BarcodeIcon className="h-4 w-4" />
                           </button>
@@ -631,7 +639,7 @@ const AssetManagement = () => {
                             <button 
                               onClick={() => handleEdit(asset)}
                               title="Edit Item"
-                              className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-all"
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
@@ -650,7 +658,7 @@ const AssetManagement = () => {
                             <>
                               <button 
                                 onClick={() => handleQuickStockUpdate(asset, 'IN')}
-                                className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                                className="p-1.5 text-primary hover:bg-primary-50 rounded-lg transition-all"
                               >
                                 <ArrowUpCircle className="h-4 w-4" />
                               </button>
@@ -680,7 +688,7 @@ const AssetManagement = () => {
                 >
                   Previous
                 </button>
-                <div className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-xl text-sm border border-indigo-100">
+                <div className="flex items-center px-4 py-2 bg-primary-50 text-primary font-bold rounded-xl text-sm border border-primary-100">
                   Page {currentPage} of {totalPages}
                 </div>
                 <button 
@@ -700,7 +708,7 @@ const AssetManagement = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
-              <div className={`p-2 rounded-lg ${confirmUpdate.type === 'IN' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+              <div className={`p-2 rounded-lg ${confirmUpdate.type === 'IN' ? 'bg-primary-50 text-primary' : 'bg-accent-50 text-accent'}`}>
                 {confirmUpdate.type === 'IN' ? <ArrowUpCircle className="h-6 w-6" /> : <ArrowDownCircle className="h-6 w-6" />}
               </div>
               <h3 className="text-lg font-bold text-gray-900">Confirm Stock {confirmUpdate.type === 'IN' ? 'Increase' : 'Decrease'}</h3>
@@ -721,13 +729,13 @@ const AssetManagement = () => {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500 font-medium">Action:</span>
-                <span className={`font-bold ${confirmUpdate.type === 'IN' ? 'text-emerald-600' : 'text-red-600'}`}>
+                <span className={`font-bold ${confirmUpdate.type === 'IN' ? 'text-primary' : 'text-accent'}`}>
                   {confirmUpdate.type === 'IN' ? '+1' : '-1'} Unit
                 </span>
               </div>
               <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
                 <span className="text-gray-500 font-medium">New Stock:</span>
-                <span className="text-indigo-600 font-black">
+                <span className="text-primary font-black">
                   {confirmUpdate.type === 'IN' ? confirmUpdate.asset.availableQuantity + 1 : confirmUpdate.asset.availableQuantity - 1} {confirmUpdate.asset.unit}
                 </span>
               </div>
@@ -743,7 +751,7 @@ const AssetManagement = () => {
               <button 
                 onClick={performStockUpdate}
                 className={`py-2.5 text-white font-bold rounded-xl transition-all text-sm shadow-md ${
-                  confirmUpdate.type === 'IN' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                  confirmUpdate.type === 'IN' ? 'bg-primary hover:bg-primary-700' : 'bg-accent hover:bg-accent-700'
                 }`}
               >
                 Confirm Update
@@ -759,7 +767,7 @@ const AssetManagement = () => {
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100">
+                <div className="p-2.5 bg-primary text-white rounded-xl shadow-lg shadow-primary/10">
                   <Package className="h-6 w-6" />
                 </div>
                 <div>
@@ -774,9 +782,9 @@ const AssetManagement = () => {
 
             <div className="p-8 space-y-8">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                  <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Available</p>
-                  <p className="text-2xl font-black text-indigo-600">{viewAsset.availableQuantity} <span className="text-xs font-bold opacity-60">{viewAsset.unit}</span></p>
+                <div className="bg-primary-50 p-4 rounded-2xl border border-primary-100">
+                  <p className="text-[10px] font-bold text-primary/60 uppercase tracking-wider mb-1">Available</p>
+                  <p className="text-2xl font-black text-primary">{viewAsset.availableQuantity} <span className="text-xs font-bold opacity-60">{viewAsset.unit}</span></p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Total Stock</p>
@@ -789,7 +797,7 @@ const AssetManagement = () => {
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Status</p>
                   <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    viewAsset.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                    viewAsset.status === 'active' ? 'bg-primary-100 text-primary-700' : 'bg-accent-100 text-accent-700'
                   }`}>{viewAsset.status}</span>
                 </div>
               </div>
@@ -849,7 +857,7 @@ const AssetManagement = () => {
                   setViewAsset(null);
                   handleQuickStockUpdate(viewAsset, 'IN');
                 }}
-                className="px-4 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm shadow-md"
+                className="px-4 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-700 transition-all text-sm shadow-md"
               >
                 Stock In (+1)
               </button>
@@ -890,7 +898,7 @@ const AssetManagement = () => {
               <div className="grid grid-cols-1 gap-3">
                 <button 
                   onClick={() => window.print()} 
-                  className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-700 transition-all shadow-lg shadow-primary/10 flex items-center justify-center gap-2"
                 >
                   <Plus className="h-4 w-4" /> Print Label
                 </button>

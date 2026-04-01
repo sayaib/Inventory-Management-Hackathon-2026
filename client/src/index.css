@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+@theme {
+  --color-primary: #173e77;
+  --color-primary-50: color-mix(in oklab, #173e77 8%, white);
+  --color-primary-100: color-mix(in oklab, #173e77 14%, white);
+  --color-primary-200: color-mix(in oklab, #173e77 22%, white);
+  --color-primary-700: color-mix(in oklab, #173e77 85%, black);
+  --color-primary-800: color-mix(in oklab, #173e77 72%, black);
+
+  --color-accent: #c62222;
+  --color-accent-50: color-mix(in oklab, #c62222 7%, white);
+  --color-accent-100: color-mix(in oklab, #c62222 13%, white);
+  --color-accent-200: color-mix(in oklab, #c62222 20%, white);
+  --color-accent-700: color-mix(in oklab, #c62222 85%, black);
+  --color-accent-800: color-mix(in oklab, #c62222 72%, black);
+
+  --color-muted: #727371;
+  --color-muted-50: color-mix(in oklab, #727371 8%, white);
+  --color-muted-100: color-mix(in oklab, #727371 14%, white);
+  --color-muted-200: color-mix(in oklab, #727371 20%, white);
+  --color-muted-700: color-mix(in oklab, #727371 85%, black);
+  --color-muted-800: color-mix(in oklab, #727371 72%, black);
+}

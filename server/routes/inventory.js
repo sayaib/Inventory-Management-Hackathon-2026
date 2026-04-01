@@ -2,11 +2,14 @@ const express = require('express');
 const Asset = require('../models/Asset');
 const InventoryLog = require('../models/InventoryLog');
 const Project = require('../models/Project');
+const User = require('../models/User');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { ROLES } = require('../constants/roles');
 const { recordAuditLog } = require('../utils/recordAuditLog');
 
 const router = express.Router();
+
+const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLowerCase();
 
 // Get consumption logs (OUT movements)
 router.get('/logs', authMiddleware, async (req, res) => {
@@ -179,7 +182,7 @@ router.post('/add', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN
 });
 
 // Update stock by SKU (Convenience for QR/Barcode scanning)
-router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
+router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]), async (req, res) => {
   try {
     const { sku, quantityChange, type, projectId, reason, unitCost, notes, reference } = req.body;
     
@@ -207,6 +210,40 @@ router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, RO
       if (type === 'OUT') return projectId ? 'CONSUMPTION' : 'ADJUSTMENT';
       return 'ADJUSTMENT';
     })();
+
+    if (req.user?.role === ROLES.PROJECT_MANAGER) {
+      if (type !== 'OUT' || !projectId || resolvedReason !== 'CONSUMPTION') {
+        return res.status(403).json({ message: 'Access denied. Project Manager can only perform consumption stock out for a project.' });
+      }
+
+      const requesterEmail = String(req.user.email || '').toLowerCase();
+      const managerEmail = String(project?.managerEmail || '').toLowerCase();
+      const ownsProject = (
+        (requesterEmail && managerEmail && requesterEmail === managerEmail) ||
+        String(project?.managerUserId || '') === String(req.user.id || '')
+      );
+
+      let canAccess = ownsProject;
+
+      if (!canAccess) {
+        if (req.user.profileDepartment === undefined) {
+          try {
+            const userDoc = await User.findById(req.user.id).select('profile.department');
+            req.user.profileDepartment = userDoc?.profile?.department || '';
+          } catch (error) {
+            req.user.profileDepartment = '';
+          }
+        }
+
+        const userDept = normalizeDepartmentForCompare(req.user.profileDepartment);
+        const projectDept = normalizeDepartmentForCompare(project?.department);
+        if (userDept && projectDept && userDept === projectDept) canAccess = true;
+      }
+
+      if (!canAccess) {
+        return res.status(403).json({ message: 'Access denied. You do not have permission for this project.' });
+      }
+    }
 
     const coerceUnitCost = (v) => {
       const n = Number(v);
@@ -351,6 +388,150 @@ router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, RO
     res.json({ message: `Stock ${type === 'IN' ? 'added' : 'removed'} successfully`, asset, log });
   } catch (error) {
     res.status(500).json({ message: 'Failed to update stock', error: error.message });
+  }
+});
+
+router.post('/undo-utilization', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]), async (req, res) => {
+  try {
+    const { projectId, assetIdOrSku, quantity } = req.body || {};
+    if (!projectId) return res.status(400).json({ message: 'projectId is required' });
+    if (!assetIdOrSku) return res.status(400).json({ message: 'assetIdOrSku is required' });
+
+    const project = await Project.findById(projectId);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+
+    if (req.user?.role === ROLES.PROJECT_MANAGER) {
+      const requesterEmail = String(req.user.email || '').toLowerCase();
+      const managerEmail = String(project?.managerEmail || '').toLowerCase();
+      const ownsProject = (
+        (requesterEmail && managerEmail && requesterEmail === managerEmail) ||
+        String(project?.managerUserId || '') === String(req.user.id || '')
+      );
+
+      if (!ownsProject) {
+        return res.status(403).json({ message: 'Access denied. You do not have permission for this project.' });
+      }
+    }
+
+    const asset = await Asset.findOne({
+      $or: [{ assetId: assetIdOrSku }, { sku: assetIdOrSku }]
+    });
+    if (!asset) return res.status(404).json({ message: 'Asset not found' });
+
+    const netAgg = await InventoryLog.aggregate([
+      { $match: { projectId: project._id, assetId: asset.assetId, type: { $in: ['IN', 'OUT'] } } },
+      {
+        $group: {
+          _id: '$assetId',
+          netUsed: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'OUT'] }, '$quantity', { $multiply: ['$quantity', -1] }]
+            }
+          }
+        }
+      }
+    ]);
+    const netUsed = Math.max(0, Number(netAgg?.[0]?.netUsed || 0));
+    if (netUsed <= 0) return res.status(400).json({ message: 'Nothing to undo for this item in this project' });
+
+    const latestOutLog = await InventoryLog.findOne({
+      projectId: project._id,
+      assetId: asset.assetId,
+      type: 'OUT',
+      reason: 'CONSUMPTION'
+    }).sort({ timestamp: -1, createdAt: -1 });
+
+    const requested = quantity === undefined ? null : Number(quantity);
+    if (requested !== null && (!Number.isFinite(requested) || requested <= 0)) {
+      return res.status(400).json({ message: 'quantity must be a positive number' });
+    }
+
+    const defaultUndoQty = Math.max(0, Number(latestOutLog?.quantity || 0));
+    const rawUndoQty = requested ?? defaultUndoQty;
+    const undoQty = Math.min(netUsed, Math.max(0, rawUndoQty));
+
+    if (!Number.isFinite(undoQty) || undoQty <= 0) {
+      return res.status(400).json({ message: 'Unable to determine undo quantity' });
+    }
+
+    const previousQuantity = asset.totalQuantity;
+    asset.totalQuantity += undoQty;
+    asset.allocatedQuantity += undoQty;
+    asset.availableQuantity = asset.totalQuantity - asset.allocatedQuantity;
+
+    const movementUnitCost = Number(latestOutLog?.unitCost ?? asset.purchaseCost ?? 0) || 0;
+    const movementTotalCost = undoQty * movementUnitCost;
+
+    if (!Array.isArray(asset.costLots)) asset.costLots = [];
+    asset.costLots.push({
+      quantity: undoQty,
+      unitCost: movementUnitCost,
+      receivedAt: new Date(),
+      source: 'RETURN',
+      reference: String(latestOutLog?._id || '')
+    });
+
+    const idx = (project.materials || []).findIndex((m) => m.assetId === asset.assetId);
+    if (idx >= 0) {
+      project.materials[idx].allocatedQuantity = Number(project.materials[idx].allocatedQuantity || 0) + undoQty;
+      project.materials[idx].sku = asset.sku;
+      project.materials[idx].itemName = asset.itemName;
+      project.materials[idx].unit = asset.unit || project.materials[idx].unit;
+    } else {
+      project.materials = project.materials || [];
+      project.materials.push({
+        assetId: asset.assetId,
+        sku: asset.sku,
+        itemName: asset.itemName,
+        unit: asset.unit || 'pcs',
+        plannedQuantity: 0,
+        allocatedQuantity: undoQty
+      });
+    }
+
+    await asset.save();
+    await project.save();
+
+    const log = new InventoryLog({
+      assetId: asset.assetId,
+      itemName: asset.itemName,
+      sku: asset.sku,
+      projectId: project._id,
+      projectName: project.name || '',
+      type: 'IN',
+      reason: 'RETURN',
+      quantity: undoQty,
+      unitCost: movementUnitCost,
+      totalCost: movementTotalCost,
+      notes: `Undo utilization for ${project.code}`,
+      performedBy: req.user.username || req.user.id,
+      department: asset.department,
+      previousQuantity,
+      newQuantity: asset.totalQuantity
+    });
+    await log.save();
+
+    await recordAuditLog({
+      req,
+      action: 'INVENTORY_UTILIZATION_UNDO',
+      entityType: 'Asset',
+      entityId: asset._id,
+      details: {
+        projectId: project._id,
+        projectCode: project.code,
+        assetId: asset.assetId,
+        sku: asset.sku,
+        itemName: asset.itemName,
+        quantity: undoQty,
+        previousQuantity,
+        newQuantity: asset.totalQuantity,
+        referenceOutLogId: String(latestOutLog?._id || '')
+      }
+    });
+
+    res.json({ message: 'Utilization undone successfully', asset, project, log });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to undo utilization', error: error.message });
   }
 });
 

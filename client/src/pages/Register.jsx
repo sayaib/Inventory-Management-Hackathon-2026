@@ -49,21 +49,21 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
       <div className="max-w-sm w-full space-y-6 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
         <div className="text-center">
-          <div className="mx-auto h-10 w-10 bg-green-100 flex items-center justify-center rounded-full">
-            <UserPlus className="h-5 w-5 text-green-600" />
+          <div className="mx-auto h-10 w-10 bg-primary-100 flex items-center justify-center rounded-full">
+            <UserPlus className="h-5 w-5 text-primary" />
           </div>
           <h2 className="mt-4 text-2xl font-extrabold text-gray-900">Register</h2>
           <p className="mt-1 text-xs text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link to="/login" className="font-medium text-primary hover:text-primary-700">
               Sign in here
             </Link>
           </p>
         </div>
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-lg">
-              <p className="text-xs text-red-700">{error}</p>
+            <div className="bg-accent-50 border-l-4 border-accent p-3 rounded-r-lg">
+              <p className="text-xs text-accent-700">{error}</p>
             </div>
           )}
           <div className="space-y-3">
@@ -77,7 +77,7 @@ const Register = () => {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
+                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"
                 placeholder="Username"
               />
             </div>
@@ -91,7 +91,7 @@ const Register = () => {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
+                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"
                 placeholder="Email address"
               />
             </div>
@@ -105,7 +105,7 @@ const Register = () => {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all"
+                className="appearance-none block w-full px-9 py-2 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all"
                 placeholder="Password"
               />
             </div>
@@ -117,7 +117,7 @@ const Register = () => {
                 name="role"
                 value={formData.role}
                 onChange={handleChange}
-                className="appearance-none block w-full px-9 py-2 border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm transition-all bg-white"
+                className="appearance-none block w-full px-9 py-2 border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm transition-all bg-white"
               >
                 {Object.values(ROLES).map((role) => (
                   <option key={role} value={role}>
@@ -132,7 +132,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-primary hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="animate-spin h-4 w-4 mr-2" />

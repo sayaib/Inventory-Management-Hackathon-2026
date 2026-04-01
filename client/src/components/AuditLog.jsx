@@ -172,7 +172,7 @@ const AuditLog = () => {
           <div className="flex gap-2 lg:col-span-12">
             <button
               type="submit"
-              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-indigo-700"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white transition hover:bg-primary-700"
               disabled={loading}
             >
               Apply filters
@@ -256,7 +256,7 @@ const AuditLog = () => {
                         {safePrettyJson(log.details).slice(0, 160)}
                         {safePrettyJson(log.details).length > 160 ? '…' : ''}
                       </div>
-                      <div className="mt-1 text-xs font-bold text-indigo-700">Click to view</div>
+                      <div className="mt-1 text-xs font-bold text-primary-700">Click to view</div>
                     </td>
                   </tr>
                 ))

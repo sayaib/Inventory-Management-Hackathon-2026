@@ -13,6 +13,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { ROLES } from './constants/roles';
 import Projects from './pages/Projects';
 import FinancePanel from './pages/FinancePanel';
+import BomDashboard from './pages/BomDashboard';
+import AddBom from './pages/AddBom';
+import SubmittedBom from './pages/SubmittedBom';
 
 function App() {
   return (
@@ -30,6 +33,15 @@ function App() {
             <Route path="/inventory" element={<AssetManagement />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/bom" element={<BomDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.PRESALE]} />}>
+            <Route path="/bom/:projectId/add" element={<AddBom />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.INVENTORY_MANAGER, ROLES.ADMIN]} />}>
+            <Route path="/inventory/submitted-bom" element={<SubmittedBom />} />
           </Route>
 
           {/* Admin Protected Routes */}

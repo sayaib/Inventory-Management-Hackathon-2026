@@ -99,7 +99,7 @@ const AdminProfile = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
@@ -109,7 +109,7 @@ const AdminProfile = () => {
       <div className="rounded-xl border border-slate-200 bg-white">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-700">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary-700">
               <UserIcon className="h-4 w-4" />
             </span>
             <div>
@@ -269,7 +269,7 @@ const AdminProfile = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="text-sm">
               {error && <p className="font-medium text-rose-700">{error}</p>}
-              {success && <p className="font-medium text-emerald-700">{success}</p>}
+              {success && <p className="font-medium text-primary-700">{success}</p>}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -284,7 +284,7 @@ const AdminProfile = () => {
               <button
                 type="submit"
                 disabled={saving || !canSubmit}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save
