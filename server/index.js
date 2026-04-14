@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-const { ensureAdminUser } = require('./initAdmin');
+const { ensureAdminUser, ensureDummyInventory } = require('./initAdmin');
 
 dotenv.config();
 
@@ -33,6 +33,7 @@ mongoose.connect(MONGODB_URI)
   .then(async () => {
     console.log('MongoDB connected successfully');
     await ensureAdminUser();
+    await ensureDummyInventory();
   })
   .catch(err => {
     console.error('MongoDB connection error:', err);

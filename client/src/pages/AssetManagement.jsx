@@ -875,7 +875,7 @@ const AssetManagement = () => {
       {/* Barcode Modal */}
       {barcodeAsset && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="text-center space-y-6">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Item Barcode</h3>
@@ -884,12 +884,13 @@ const AssetManagement = () => {
                 </button>
               </div>
               
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-inner flex flex-col items-center">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-inner flex flex-col items-center w-full">
                 <Barcode 
-                  value={barcodeAsset.sku || barcodeAsset.assetId} 
-                  width={1.5} 
+                  value={barcodeAsset._id || barcodeAsset.sku || barcodeAsset.assetId} 
+                  width={(String(barcodeAsset?._id || barcodeAsset?.sku || barcodeAsset?.assetId || '').length || 0) > 24 ? 0.8 : 0.95} 
                   height={60} 
                   fontSize={12}
+                  margin={0}
                   background="#ffffff"
                 />
                 <p className="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{barcodeAsset.itemName}</p>

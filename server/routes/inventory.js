@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Asset = require('../models/Asset');
 const InventoryLog = require('../models/InventoryLog');
 const Project = require('../models/Project');
@@ -198,8 +199,14 @@ router.get('/', authMiddleware, async (req, res) => {
 // Search asset by AssetId or SKU
 router.get('/id/:id', authMiddleware, async (req, res) => {
   try {
-    const asset = await Asset.findOne({ 
-      $or: [ { assetId: req.params.id }, { sku: req.params.id } ] 
+    const rawId = String(req.params.id || '');
+    if (mongoose.Types.ObjectId.isValid(rawId)) {
+      const byMongoId = await Asset.findById(rawId);
+      if (byMongoId) return res.json(byMongoId);
+    }
+
+    const asset = await Asset.findOne({
+      $or: [{ assetId: rawId }, { sku: rawId }]
     });
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
     res.json(asset);
@@ -248,8 +255,12 @@ router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, RO
     const { sku, quantityChange, type, projectId, reason, unitCost, notes, reference } = req.body;
     
     // Find asset by sku OR assetId
-    const asset = await Asset.findOne({ 
-      $or: [ { sku: sku }, { assetId: sku } ] 
+    const rawId = String(sku || '');
+    const or = [{ sku: rawId }, { assetId: rawId }];
+    if (mongoose.Types.ObjectId.isValid(rawId)) or.push({ _id: rawId });
+
+    const asset = await Asset.findOne({
+      $or: or
     });
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
@@ -475,7 +486,11 @@ router.post('/undo-utilization', authMiddleware, roleMiddleware([ROLES.WAREHOUSE
     }
 
     const asset = await Asset.findOne({
-      $or: [{ assetId: assetIdOrSku }, { sku: assetIdOrSku }]
+      $or: [
+        { assetId: assetIdOrSku },
+        { sku: assetIdOrSku },
+        ...(mongoose.Types.ObjectId.isValid(String(assetIdOrSku || '')) ? [{ _id: assetIdOrSku }] : [])
+      ]
     });
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
@@ -658,7 +673,11 @@ router.get('/finance/cost-history', authMiddleware, roleMiddleware([ROLES.FINANC
     }
 
     const asset = await Asset.findOne({
-      $or: [{ assetId: assetIdOrSku }, { sku: assetIdOrSku }]
+      $or: [
+        { assetId: assetIdOrSku },
+        { sku: assetIdOrSku },
+        ...(mongoose.Types.ObjectId.isValid(String(assetIdOrSku || '')) ? [{ _id: assetIdOrSku }] : [])
+      ]
     });
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
