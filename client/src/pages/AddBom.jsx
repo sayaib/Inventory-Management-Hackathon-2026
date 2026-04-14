@@ -187,6 +187,7 @@ const createEditableExistingRow = (b) => {
     leadTime: b?.leadTime ?? '',
     leadTimeWeeks: String(b?.leadTimeWeeks ?? ''),
     saving: false,
+    deleting: false,
     error: '',
     savedAt: ''
   };
@@ -424,6 +425,32 @@ const AddBom = () => {
       return;
     } finally {
       updateExistingRow(idx, { saving: false, savedAt: new Date().toISOString() });
+    }
+  };
+
+  const handleDeleteExistingRow = async (idx) => {
+    const row = existingRows[idx];
+    if (!row?._id || !projectId) {
+      setError('BOM row id missing');
+      return;
+    }
+    const confirmed = window.confirm(`Delete BOM row ${row.srNo || idx + 1}?`);
+    if (!confirmed) return;
+
+    updateExistingRow(idx, { deleting: true, error: '' });
+    setError('');
+    setSuccess('');
+    try {
+      await api.delete(`/projects/${projectId}/bom/${row._id}`);
+      setProject((prev) => {
+        if (!prev) return prev;
+        const nextItems = (prev.bomItems || []).filter((b) => String(b._id) !== String(row._id));
+        return { ...prev, bomItems: nextItems };
+      });
+      setExistingRows((prev) => prev.filter((r) => String(r._id) !== String(row._id)));
+      setSuccess('BOM row deleted');
+    } catch (err) {
+      updateExistingRow(idx, { deleting: false, error: err.response?.data?.message || 'Failed to delete BOM row' });
     }
   };
 
@@ -681,7 +708,7 @@ const AddBom = () => {
                     <th className="px-2 py-2 text-left">MOQ</th>
                     <th className="px-2 py-2 text-left">Remarks</th>
                     <th className="px-2 py-2 text-left">Lead time (weeks)</th>
-                    <th className="px-2 py-2 text-left">Save</th>
+                    <th className="px-2 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -828,16 +855,27 @@ const AddBom = () => {
                               inputMode="numeric"
                             />
                           </td>
-                          <td className="px-2 py-2 min-w-[130px]">
-                            <button
-                              type="button"
-                              onClick={() => handleSaveExistingRow(idx)}
-                              disabled={row.saving || !dirty}
-                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs hover:bg-primary-700 transition-all disabled:opacity-50"
-                            >
-                              <Save className="h-4 w-4" />
-                              {row.saving ? 'Saving…' : 'Save'}
-                            </button>
+                          <td className="px-2 py-2 min-w-[190px]">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveExistingRow(idx)}
+                                disabled={row.saving || row.deleting || !dirty}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs hover:bg-primary-700 transition-all disabled:opacity-50"
+                              >
+                                <Save className="h-4 w-4" />
+                                {row.saving ? 'Saving…' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteExistingRow(idx)}
+                                disabled={row.saving || row.deleting}
+                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-600 text-white font-bold text-xs hover:bg-accent-700 transition-all disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                {row.deleting ? 'Deleting…' : 'Delete'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

@@ -940,6 +940,44 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
   }
 });
 
+router.delete('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepartment, canManageBom, async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.projectId);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    if (!canAccessProject(req, project)) return res.status(403).json({ message: 'Access denied. You do not have permission.' });
+
+    const bomItem = project.bomItems?.id?.(req.params.bomItemId);
+    if (!bomItem) return res.status(404).json({ message: 'BOM item not found' });
+
+    const details = {
+      projectCode: project.code,
+      projectName: project.name,
+      bomItemId: String(bomItem._id),
+      srNo: bomItem.srNo,
+      typeOfComponent: bomItem.typeOfComponent,
+      supplierName: bomItem.supplierName,
+      nomenclatureDescription: bomItem.nomenclatureDescription,
+      totalQtyWithSpare: bomItem.totalQtyWithSpare,
+      totalPrice: bomItem.totalPrice
+    };
+
+    bomItem.deleteOne();
+    await project.save();
+
+    await recordAuditLog({
+      req,
+      action: 'PROJECT_BOM_DELETE',
+      entityType: 'Project',
+      entityId: project._id,
+      details
+    });
+
+    res.json({ projectId: project._id, bomItemId: req.params.bomItemId });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete BOM item', error: error.message });
+  }
+});
+
 const normalizeTextOrUndefined = (value) => {
   if (value === undefined || value === null) return undefined;
   const trimmed = String(value).trim();
