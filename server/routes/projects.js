@@ -688,7 +688,13 @@ router.get('/:projectId/summary', authMiddleware, attachUserProfileDepartment, c
 });
 
 const toNumberOrZero = (value) => {
-  const parsed = Number(value);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const sanitized = String(value ?? '')
+    .replace(/,/g, '')
+    .replace(/[^\d.+-]/g, '')
+    .trim();
+  if (!sanitized || sanitized === '+' || sanitized === '-' || sanitized === '.') return 0;
+  const parsed = Number(sanitized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
@@ -737,6 +743,22 @@ const buildBomItem = (payload) => {
     inventoryItemName: typeof payload.inventoryItemName === 'string' ? payload.inventoryItemName.trim() : '',
     plannedQty
   };
+};
+
+const hasMeaningfulBomContent = (item) => {
+  if (!item) return false;
+  return Boolean(
+    item.typeOfComponent ||
+    item.nomenclatureDescription ||
+    item.partNoDrg ||
+    item.make ||
+    item.supplierName ||
+    item.qtyPerBoard > 0 ||
+    item.boardReq > 0 ||
+    item.spareQty > 0 ||
+    item.unitCost > 0 ||
+    item.moq > 0
+  );
 };
 
 router.get('/:projectId/bom', authMiddleware, attachUserProfileDepartment, canViewProjects, async (req, res) => {
@@ -804,7 +826,7 @@ router.post('/:projectId/bom/bulk', authMiddleware, attachUserProfileDepartment,
     const added = [];
     for (const raw of items) {
       const next = buildBomItem(raw || {});
-      if (!next.typeOfComponent || !next.nomenclatureDescription) continue;
+      if (!hasMeaningfulBomContent(next)) continue;
       project.bomItems.push(next);
       added.push(next);
     }

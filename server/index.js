@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const { ensureAdminUser } = require('./initAdmin');
 
 dotenv.config();
 
@@ -29,10 +30,13 @@ app.use('/api/audit-logs', auditLogRoutes);
 // Database Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_db';
 mongoose.connect(MONGODB_URI)
-  .then(() => console.log('MongoDB connected successfully'))
+  .then(async () => {
+    console.log('MongoDB connected successfully');
+    await ensureAdminUser();
+  })
   .catch(err => {
     console.error('MongoDB connection error:', err);
-    console.log('Continuing without MongoDB for demo purposes (using in-memory store if needed)');
+    console.log('Server startup completed without an active MongoDB connection');
   });
 
 app.listen(PORT, () => {

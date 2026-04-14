@@ -76,20 +76,16 @@ const AdminPanel = () => {
     return localStorage.getItem('admin_asset_location') || localStorage.getItem('admin_company_location') || 'warehouse';
   });
   const [companyDirectory, setCompanyDirectory] = useState(() => {
-    const fallback = [
-      { id: 'optimized_solutions', name: 'Optimized Solutions', locations: ['Pune', 'Mumbai', 'Delhi'] },
-      { id: 'electrotech', name: 'Electrotech', locations: ['Bangalore', 'Hyderabad', 'Chennai'] }
-    ];
     try {
       const raw = localStorage.getItem('admin_company_directory_v1');
-      if (!raw) return fallback;
+      if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : fallback;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return fallback;
+      return [];
     }
   });
-  const [selectedCompanyId, setSelectedCompanyId] = useState(() => localStorage.getItem('admin_selected_company_id') || 'optimized_solutions');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => localStorage.getItem('admin_selected_company_id') || '');
   const [selectedCompanyLocation, setSelectedCompanyLocation] = useState(() => localStorage.getItem('admin_selected_company_location') || '');
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newLocationName, setNewLocationName] = useState('');
@@ -586,37 +582,6 @@ const AdminPanel = () => {
     return list;
   })();
  
-  const dummyInventoryStatus = [
-    { name: 'Steel Rod 12mm', department: 'ATE', status: 'Completed', allocated: true, procured: true, utilUsed: 120, utilDen: 200, utilPct: 60, lastActivityAt: new Date().toISOString() },
-    { name: 'Copper Wire 2.5mm', department: 'IT', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
-    { name: 'PVC Pipe 1"', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 40, utilDen: 50, utilPct: 80, lastActivityAt: new Date().toISOString() },
-    { name: 'Server RAM 16GB', department: 'DTMA', status: 'In Progress', allocated: true, procured: false, utilUsed: 8, utilDen: 32, utilPct: 25, lastActivityAt: new Date().toISOString() },
-    { name: 'Safety Gloves', department: 'PES', status: 'Completed', allocated: true, procured: true, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
-    { name: 'Paint Primer', department: 'ATE', status: 'Completed', allocated: true, procured: true, utilUsed: 18, utilDen: 30, utilPct: 60, lastActivityAt: new Date().toISOString() },
-    { name: 'Router AX', department: 'IT', status: 'In Progress', allocated: false, procured: true, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
-    { name: 'Bearing 6203', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 75, utilDen: 100, utilPct: 75, lastActivityAt: new Date().toISOString() },
-    { name: 'LED Panel', department: 'DTMA', status: 'Completed', allocated: true, procured: true, utilUsed: 20, utilDen: 25, utilPct: 80, lastActivityAt: new Date().toISOString() },
-    { name: 'Cable Tray', department: 'PES', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 0, utilPct: 0, lastActivityAt: null },
-    { name: 'Aluminium Sheet 2mm', department: 'PES', status: 'In Progress', allocated: true, procured: false, utilUsed: 0, utilDen: 60, utilPct: 0, lastActivityAt: null },
-    { name: 'Hydraulic Oil 20L', department: 'ATE', status: 'In Progress', allocated: true, procured: true, utilUsed: 0, utilDen: 15, utilPct: 0, lastActivityAt: null },
-    { name: 'PLC Controller Unit', department: 'ATE', status: 'Completed', allocated: true, procured: true, utilUsed: 4, utilDen: 4, utilPct: 100, lastActivityAt: new Date().toISOString() },
-    { name: 'Industrial Proximity Sensor', department: 'IoT', status: 'In Progress', allocated: true, procured: false, utilUsed: 6, utilDen: 20, utilPct: 30, lastActivityAt: new Date().toISOString() },
-    { name: 'RJ45 Patch Cable 2m', department: 'IT', status: 'Completed', allocated: true, procured: true, utilUsed: 60, utilDen: 80, utilPct: 75, lastActivityAt: new Date().toISOString() },
-    { name: 'UPS Battery Pack', department: 'IT', status: 'In Progress', allocated: true, procured: true, utilUsed: 1, utilDen: 4, utilPct: 25, lastActivityAt: new Date().toISOString() },
-    { name: 'CNC Cutting Tool Set', department: 'PES', status: 'Completed', allocated: true, procured: true, utilUsed: 10, utilDen: 12, utilPct: 83, lastActivityAt: new Date().toISOString() },
-    { name: 'Thermal Camera Module', department: 'DTMA', status: 'In Progress', allocated: false, procured: false, utilUsed: 0, utilDen: 6, utilPct: 0, lastActivityAt: null },
-    { name: 'Fiber Media Converter', department: 'IT', status: 'Completed', allocated: true, procured: true, utilUsed: 2, utilDen: 2, utilPct: 100, lastActivityAt: new Date().toISOString() },
-    { name: 'Arduino Mega 2560', department: 'IoT', status: 'Completed', allocated: true, procured: true, utilUsed: 12, utilDen: 15, utilPct: 80, lastActivityAt: new Date().toISOString() },
-    { name: 'Projector Lamp', department: 'DTMA', status: 'In Progress', allocated: true, procured: false, utilUsed: 0, utilDen: 3, utilPct: 0, lastActivityAt: null },
-    { name: 'Toolbox Set', department: 'PES', status: 'Completed', allocated: true, procured: true, utilUsed: 8, utilDen: 10, utilPct: 80, lastActivityAt: new Date().toISOString() }
-  ];
- 
-   const dummyInventoryStatusResolved = dummyInventoryStatus.map((r) => ({
-     ...r,
-     allocated: r.status === 'Completed' ? true : r.allocated,
-     procured: r.status === 'Completed' ? true : r.procured
-   }));
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100">
       <div className="flex min-h-screen w-full">
@@ -977,7 +942,7 @@ const AdminPanel = () => {
                         const raw = movementTrend;
                         const pad2 = (n) => String(n).padStart(2, '0');
                         const dateKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-                        const makeFallbackSeries = () => {
+                        const makeDateSeries = () => {
                           let from = new Date(`${startDate}T00:00:00`);
                           let to = new Date(`${endDate}T23:59:59.999`);
                           if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from > to) {
@@ -997,24 +962,15 @@ const AdminPanel = () => {
                           return days.map((d) => ({ date: d, inCount: 0, outCount: 0 }));
                         };
 
-                        const fallback = makeFallbackSeries();
+                        const dateSeries = makeDateSeries();
                         const rawMap = new Map(
                           (Array.isArray(raw) ? raw : []).map((d) => [
                             d?.date,
                             { date: d?.date, inCount: Number(d?.inCount) || 0, outCount: Number(d?.outCount) || 0 }
                           ])
                         );
-                        const base = fallback.map((d) => rawMap.get(d.date) || d);
-                        const hasReal = base.some((d) => (Number(d.inCount) || 0) > 0 || (Number(d.outCount) || 0) > 0);
-                        const data = hasReal
-                          ? base
-                          : base.map((d, idx) => {
-                            const wave = Math.sin(idx / 2);
-                            const wave2 = Math.cos(idx / 3);
-                            const inCount = Math.max(0, Math.round(6 + 4 * wave + (idx % 3)));
-                            const outCount = Math.max(0, Math.round(4 + 3 * wave2 + ((idx + 1) % 2)));
-                            return { ...d, inCount, outCount };
-                          });
+                        const data = dateSeries.map((d) => rawMap.get(d.date) || d);
+                        const hasReal = data.some((d) => (Number(d.inCount) || 0) > 0 || (Number(d.outCount) || 0) > 0);
                         const height = 220;
                         const padL = 36;
                         const padR = 16;
@@ -1031,8 +987,8 @@ const AdminPanel = () => {
                         const labelStep = data.length > 14 ? Math.ceil(data.length / 14) : 1;
                         return (
                           <div className="w-full overflow-x-auto">
-                            {data.length === 0 ? (
-                              <div className="text-sm text-slate-500">No movement data.</div>
+                            {!hasReal ? (
+                              <div className="text-sm text-slate-500">No stock movement recorded for the selected dates.</div>
                             ) : (
                               <svg width={width} height={height} className="text-slate-400">
                                 <rect x="0" y="0" width={width} height={height} rx="12" className="fill-slate-50" />
@@ -1155,79 +1111,14 @@ const AdminPanel = () => {
                   <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-extrabold text-slate-900">Current inventory status</div>
-                      <div className="text-xs text-slate-500">Allocated, utilization, and procurement (dummy)</div>
+                      <div className="text-xs text-slate-500">Awaiting live inventory allocation and procurement data.</div>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-500">{dummyInventoryStatusResolved.length} items</div>
+                    <div className="text-[11px] font-bold text-slate-500">No live items</div>
                   </div>
                   <div className="w-full overflow-auto">
-                    {(() => {
-                      const badge = (ok, yes, no) => (
-                        <span
-                          className={[
-                            'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold',
-                            ok ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-50 text-slate-700 border border-slate-200'
-                          ].join(' ')}
-                        >
-                          {ok ? yes : no}
-                        </span>
-                      );
-                      return (
-                        <table className="min-w-[1000px] w-full text-left text-xs">
-                          <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr className="text-[11px] font-extrabold text-slate-700">
-                              <th className="px-4 py-3">Asset</th>
-                              <th className="px-4 py-3">Department</th>
-                              <th className="px-4 py-3">Status</th>
-                              <th className="px-4 py-3">Allocated</th>
-                              <th className="px-4 py-3">Utilization</th>
-                              <th className="px-4 py-3">Procured</th>
-                              <th className="px-4 py-3">Last activity</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {dummyInventoryStatusResolved.map((r, idx) => (
-                              <tr key={`${r.name}-${idx}`} className="hover:bg-slate-50/70">
-                                <td className="px-4 py-3">
-                                  <div className="font-extrabold text-slate-900">{r.name}</div>
-                                </td>
-                                <td className="px-4 py-3 text-[11px] font-extrabold text-slate-700">{r.department}</td>
-                                <td className="px-4 py-3">
-                                  {(() => {
-                                    const cls =
-                                      r.status === 'Completed'
-                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                        : r.status === 'In Progress'
-                                          ? 'bg-primary/10 text-primary-700 border border-primary/20'
-                                          : 'bg-slate-50 text-slate-700 border border-slate-200';
-                                    return (
-                                      <span className={['inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-extrabold', cls].join(' ')}>
-                                        {r.status || '—'}
-                                      </span>
-                                    );
-                                  })()}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {badge(r.allocated, 'Allocated', 'Not allocated')}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-extrabold text-slate-900">{r.utilDen > 0 ? `${r.utilPct}%` : '—'}</span>
-                                    <span className="text-[11px] font-bold text-slate-500">{r.utilDen > 0 ? 'Allocated' : '—'}</span>
-                                  </div>
-                                  <div className="text-[11px] font-semibold text-slate-600">
-                                    {r.utilDen > 0 ? `${r.utilUsed} / ${r.utilDen}` : 'No planned/allocated qty'}
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  {badge(r.procured, 'Procured', 'Not procured')}
-                                </td>
-                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">{formatDateTime(r.lastActivityAt)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      );
-                    })()}
+                    <div className="px-4 py-8 text-sm text-slate-500">
+                      This section no longer displays fabricated inventory records. Live allocation and procurement data will appear here once connected.
+                    </div>
                   </div>
                 </div>
 
@@ -1488,7 +1379,7 @@ const AdminPanel = () => {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="min-w-0">
                       <h2 className="text-sm font-extrabold text-slate-900">BOM-based prediction</h2>
-                      <p className="text-xs text-slate-500">Upload a BOM or pick a project BOM to generate dummy inventory predictions.</p>
+                      <p className="text-xs text-slate-500">Upload a BOM or pick a project BOM to generate inventory predictions from live application data.</p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <button
@@ -1499,23 +1390,6 @@ const AdminPanel = () => {
                         className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
                       >
                         Refresh BOMs
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const sample = [
-                            { nomenclatureDescription: 'Steel Rod 12mm', totalQtyWithSpare: 180 },
-                            { nomenclatureDescription: 'Copper Wire 2.5mm', totalQtyWithSpare: 260 },
-                            { nomenclatureDescription: 'PVC Pipe 1"', totalQtyWithSpare: 95 },
-                            { nomenclatureDescription: 'LED Panel', totalQtyWithSpare: 40 },
-                            { nomenclatureDescription: 'Bearing 6203', totalQtyWithSpare: 120 }
-                          ];
-                          setPredictionUploadMeta({ fileName: 'sample_bom.csv', rows: sample.length });
-                          buildPredictionsFromBomItems(sample, 'sample');
-                        }}
-                        className="h-9 w-full sm:w-auto rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700"
-                      >
-                        Use sample BOM
                       </button>
                     </div>
                   </div>
@@ -1539,6 +1413,10 @@ const AdminPanel = () => {
                             if (project) {
                               buildPredictionsFromBomItems(project?.bomItems || [], `project:${project?._id || ''}`);
                               setPredictionUploadMeta({ fileName: `${project?.code || 'project'}_bom`, rows: (project?.bomItems || []).length });
+                            } else {
+                              setPredictionRows([]);
+                              setPredictionGeneratedAt('');
+                              setPredictionUploadMeta({ fileName: '', rows: 0 });
                             }
                           }}
                           className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
@@ -1687,7 +1565,7 @@ const AdminPanel = () => {
                         {predictionRows.length === 0 ? (
                           <tr>
                             <td className="px-4 py-6 text-slate-500" colSpan={7}>
-                              Upload a BOM or select a project to see dummy inventory prediction.
+                              Upload a BOM or select a project to see inventory prediction results.
                             </td>
                           </tr>
                         ) : (
@@ -2485,11 +2363,15 @@ const AdminPanel = () => {
                           className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
                           disabled={bulkApplying || companySettingsSaving}
                         >
-                          {(companyDirectory || []).map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
+                          {(companyDirectory || []).length === 0 ? (
+                            <option value="">No companies added</option>
+                          ) : (
+                            (companyDirectory || []).map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))
+                          )}
                         </select>
                         <select
                           value={selectedCompanyLocation}

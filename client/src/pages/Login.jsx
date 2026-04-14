@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   ArrowRight,
@@ -12,7 +12,6 @@ import {
   Mail,
   Package,
   ShieldCheck,
-  Sparkles,
   Warehouse,
 } from 'lucide-react';
 import { ROLES } from '../constants/roles';
@@ -25,19 +24,16 @@ const highlights = [
   {
     icon: Package,
     title: 'Inventory intelligence',
-    description: 'Keep stock movement, BOM activity, and project demand visible in one place.',
     tone: 'bg-primary/10 text-primary-700',
   },
   {
     icon: BarChart3,
     title: 'Decision-ready dashboards',
-    description: 'Surface trends early with fast visibility into operations, finance, and fulfillment.',
     tone: 'bg-accent/10 text-accent-700',
   },
   {
     icon: ShieldCheck,
     title: 'Safer access control',
-    description: 'Support admins, warehouse teams, and managers with role-based permissions.',
     tone: 'bg-emerald-100 text-emerald-700',
   },
 ];
@@ -88,21 +84,20 @@ const Login = () => {
       <div className="absolute -left-16 top-24 h-48 w-48 rounded-full bg-primary/20 blur-3xl" />
       <div className="absolute right-0 top-20 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
 
-      <div className="relative mx-auto flex h-screen max-w-7xl items-center px-3 py-3 sm:px-5 sm:py-5 lg:px-8 lg:py-6">
-        <div className="grid h-full w-full gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:gap-6">
-          <section className="hidden h-full flex-col justify-between rounded-[2rem] border border-white/10 bg-white/6 p-6 shadow-[0_32px_100px_-48px_rgba(15,23,42,0.95)] backdrop-blur-xl lg:flex lg:min-h-0 lg:p-7 xl:p-8">
+      <div className="relative mx-auto flex h-screen max-w-7xl items-center px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+        <div className="grid h-full w-full gap-4 xl:grid-cols-[1.05fr_0.95fr] xl:gap-6">
+          <section className="hidden h-full flex-col justify-between rounded-[2rem] border border-white/10 bg-white/6 p-6 shadow-[0_32px_100px_-48px_rgba(15,23,42,0.95)] backdrop-blur-xl xl:flex xl:p-8">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-slate-200/88">
-                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                Operations Command Center
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-200/88 sm:text-xs">
+                Secure inventory workspace
               </div>
 
-              <div className="mt-6 flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg shadow-slate-950/30">
+              <div className="mt-5 flex items-center gap-4 sm:mt-6">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-lg shadow-slate-950/30 sm:h-14 sm:w-14">
                   <img
                     src={APP_LOGO_URL}
                     alt="Optimized Solutions Ltd"
-                    className="h-9 w-9 rounded-xl object-contain"
+                    className="h-8 w-8 rounded-xl object-contain sm:h-9 sm:w-9"
                     loading="lazy"
                     decoding="async"
                   />
@@ -113,27 +108,22 @@ const Login = () => {
                 </div>
               </div>
 
-              <h1 className="mt-6 max-w-xl text-3xl font-black tracking-tight text-white xl:text-5xl xl:leading-[1.05]">
-                Run inventory, assets, and approvals from one focused workspace.
-              </h1>
-
-              <p className="mt-4 max-w-lg text-sm leading-6 text-slate-300 xl:text-base xl:leading-7">
-                A sharper login experience for the teams managing warehouses, projects, BOM workflows, and finance
-                visibility across the platform.
+              <p className="mt-6 max-w-lg text-sm leading-6 text-slate-300 xl:text-base xl:leading-7">
+                Built for teams tracking stock, assets, and project activity across the business.
               </p>
 
               <div className="mt-6 grid gap-3 xl:grid-cols-3">
                 <div className="rounded-2xl border border-white/10 bg-white/7 p-4">
                   <p className="text-2xl font-black text-white xl:text-3xl">24/7</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-300 xl:text-sm">Operational visibility for stock and asset movement.</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-300 xl:text-sm">Track stock and asset movement at a glance.</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/7 p-4">
                   <p className="text-2xl font-black text-white xl:text-3xl">Role-based</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-300 xl:text-sm">Built for admins, managers, warehouse, and finance.</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-300 xl:text-sm">Access built for admins, managers, and operations.</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/7 p-4">
                   <p className="text-2xl font-black text-white xl:text-3xl">Live</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-300 xl:text-sm">Access dashboards and workflow updates in real time.</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-300 xl:text-sm">Stay current with dashboards and workflow updates.</p>
                 </div>
               </div>
             </div>
@@ -153,7 +143,7 @@ const Login = () => {
               </div>
 
               <div className="space-y-3">
-                {highlights.map(({ icon: Icon, title, description, tone }) => (
+                {highlights.map(({ icon: Icon, title, tone }) => (
                   <div key={title} className="rounded-2xl border border-white/10 bg-white/7 p-3.5">
                     <div className="flex items-start gap-3">
                       <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tone}`}>
@@ -161,7 +151,6 @@ const Login = () => {
                       </span>
                       <div>
                         <p className="text-sm font-semibold text-white">{title}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-300 xl:text-sm">{description}</p>
                       </div>
                     </div>
                   </div>
@@ -170,11 +159,11 @@ const Login = () => {
             </div>
           </section>
 
-          <section className="order-1 flex h-full items-center lg:order-2">
+          <section className="order-1 flex h-full items-center xl:order-2">
             <div className="relative flex h-full w-full items-center overflow-hidden rounded-[2rem] border border-white/12 bg-white px-5 py-5 text-slate-900 shadow-[0_30px_90px_-40px_rgba(15,23,42,0.95)] sm:px-7 sm:py-7 lg:px-8 lg:py-8">
               <div className="absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top,rgba(23,62,119,0.14),transparent_70%)]" />
               <div className="relative mx-auto w-full max-w-md">
-                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 lg:hidden">
+                <div className="mb-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
                     <img
                       src={APP_LOGO_URL}
@@ -203,7 +192,7 @@ const Login = () => {
                 </div>
 
                 <p className="mt-4 text-sm leading-6 text-slate-600">
-                  Sign in with your work email to continue to your inventory workspace.
+                  Sign in with your work email to continue.
                 </p>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] font-medium text-slate-600 sm:text-xs">
@@ -317,16 +306,9 @@ const Login = () => {
                   </button>
 
                   <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-600 sm:text-sm">
-                    By continuing, you agree to follow your organization&apos;s security policies and device access rules.
+                    Use a trusted device when keeping your session active.
                   </div>
                 </form>
-
-                <p className="mt-4 text-center text-sm text-slate-600">
-                  Need a new account?{' '}
-                  <Link to="/register" className="font-semibold text-primary transition hover:text-primary-700">
-                    Register here
-                  </Link>
-                </p>
               </div>
             </div>
           </section>

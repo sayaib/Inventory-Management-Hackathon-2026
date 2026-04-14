@@ -1,13 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ClipboardList, ArrowLeft, PlusCircle, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Save, Trash2, Upload } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import api from '../api/axios';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
 
 const toNumberOrZero = (value) => {
-  const parsed = Number(value);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const sanitized = String(value ?? '')
+    .replace(/,/g, '')
+    .replace(/[^\d.+-]/g, '')
+    .trim();
+  if (!sanitized || sanitized === '+' || sanitized === '-' || sanitized === '.') return 0;
+  const parsed = Number(sanitized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
@@ -31,8 +38,115 @@ const createEmptyRow = (srNo) => ({
   additionalCost: '',
   moq: '',
   remarks: '',
+  leadTime: '',
   leadTimeWeeks: ''
 });
+
+const normalizeHeader = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const compactHeader = (value) => normalizeHeader(value).replace(/\s+/g, '');
+
+const isRowBlank = (row) =>
+  !Object.values(row || {}).some((value) => String(value ?? '').trim() !== '');
+
+const findHeaderKey = (headers, aliases) => {
+  const normalized = headers.map((header) => ({
+    header,
+    normalized: normalizeHeader(header),
+    compact: compactHeader(header)
+  }));
+
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeHeader(alias);
+    const compactAlias = compactHeader(alias);
+    const exact =
+      normalized.find((entry) => entry.normalized === normalizedAlias) ||
+      normalized.find((entry) => entry.compact === compactAlias);
+    if (exact) return exact.header;
+  }
+
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeHeader(alias);
+    const compactAlias = compactHeader(alias);
+    const partial =
+      normalized.find((entry) => entry.normalized.includes(normalizedAlias)) ||
+      normalized.find((entry) => entry.compact.includes(compactAlias));
+    if (partial) return partial.header;
+  }
+
+  return '';
+};
+
+const parseWorksheetRows = (sheet) => {
+  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  const nonEmptyRows = matrix.filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
+  if (nonEmptyRows.length === 0) return [];
+
+  const headerCells = (nonEmptyRows[0] || []).map((cell, idx) => {
+    const label = String(cell ?? '').trim();
+    return label || `Column ${idx + 1}`;
+  });
+
+  return nonEmptyRows.slice(1).map((cells) => {
+    const row = {};
+    for (let i = 0; i < headerCells.length; i += 1) {
+      row[headerCells[i]] = String(cells?.[i] ?? '').trim();
+    }
+    return row;
+  });
+};
+
+const mapImportedRows = (importedRows, startingSrNo) => {
+  if (!Array.isArray(importedRows) || importedRows.length === 0) return [];
+
+  const headers = Object.keys(importedRows[0] || {});
+  const headerKeys = {
+    typeOfComponent: findHeaderKey(headers, ['Type of Component', 'Component Type']),
+    srNo: findHeaderKey(headers, ['Sr. No.', 'Sr No', 'Serial No', 'S No']),
+    supplierName: findHeaderKey(headers, ['Supplier Name', 'Supplier']),
+    nomenclatureDescription: findHeaderKey(headers, ['Nomenclature/Description', 'Nomenclature / Description', 'Description', 'Nomenclature']),
+    partNoDrg: findHeaderKey(headers, ['Part No./Drg.', 'Part No / Drg', 'Part Number', 'Part No', 'Drg']),
+    make: findHeaderKey(headers, ['Make', 'Manufacturer']),
+    qtyPerBoard: findHeaderKey(headers, ['Qty per Board', 'Quantity per Board', 'Qty/Board']),
+    boardReq: findHeaderKey(headers, ['Board Req', 'Board Required', 'Boards Req']),
+    spareQty: findHeaderKey(headers, ['Spare qty', 'Spare Qty', 'Spare Quantity']),
+    unitCost: findHeaderKey(headers, ['Unit cost', 'Unit Cost', 'Unit Price']),
+    additionalCost: findHeaderKey(headers, ['Additional cost', 'Additional Cost']),
+    moq: findHeaderKey(headers, ['MOQ', 'Minimum Order Quantity']),
+    remarks: findHeaderKey(headers, ['Remarks', 'Remark', 'Notes']),
+    leadTime: findHeaderKey(headers, ['Lead time', 'Lead Time', 'Lead time (weeks)', 'Lead Time (Weeks)', 'Lead Weeks']),
+    leadTimeWeeks: findHeaderKey(headers, ['Lead time', 'Lead Time', 'Lead time (weeks)', 'Lead Time (Weeks)', 'Lead Weeks'])
+  };
+
+  return importedRows
+    .map((source, idx) => {
+      const next = createEmptyRow(startingSrNo + idx);
+      return {
+        ...next,
+        typeOfComponent: String(source?.[headerKeys.typeOfComponent] ?? '').trim(),
+        srNo: String(source?.[headerKeys.srNo] ?? next.srNo).trim(),
+        supplierName: String(source?.[headerKeys.supplierName] ?? '').trim(),
+        nomenclatureDescription: String(source?.[headerKeys.nomenclatureDescription] ?? '').trim(),
+        partNoDrg: String(source?.[headerKeys.partNoDrg] ?? '').trim(),
+        make: String(source?.[headerKeys.make] ?? '').trim(),
+        qtyPerBoard: String(source?.[headerKeys.qtyPerBoard] ?? '').trim(),
+        boardReq: String(source?.[headerKeys.boardReq] ?? '').trim(),
+        spareQty: String(source?.[headerKeys.spareQty] ?? '').trim(),
+        unitCost: String(source?.[headerKeys.unitCost] ?? '').trim(),
+        additionalCost: String(source?.[headerKeys.additionalCost] ?? '').trim(),
+        moq: String(source?.[headerKeys.moq] ?? '').trim(),
+        remarks: String(source?.[headerKeys.remarks] ?? '').trim(),
+        leadTime: String(source?.[headerKeys.leadTime] ?? '').trim(),
+        leadTimeWeeks: String(source?.[headerKeys.leadTimeWeeks] ?? '').trim()
+      };
+    })
+    .filter((row) => !isRowBlank({ ...row, srNo: '', remarks: '' }));
+};
 
 const deriveRow = (row) => {
   const qtyPerBoard = Math.max(0, toNumberOrZero(row.qtyPerBoard));
@@ -70,6 +184,7 @@ const createEditableExistingRow = (b) => {
     additionalCost: String(b?.additionalCost ?? ''),
     moq: String(b?.moq ?? ''),
     remarks: b?.remarks ?? '',
+    leadTime: b?.leadTime ?? '',
     leadTimeWeeks: String(b?.leadTimeWeeks ?? ''),
     saving: false,
     error: '',
@@ -99,6 +214,7 @@ const isRowDirty = (row) => {
     'additionalCost',
     'moq',
     'remarks',
+    'leadTime',
     'leadTimeWeeks'
   ];
   return keys.some((k) => String(row[k] ?? '') !== String(row._original[k] ?? ''));
@@ -121,6 +237,8 @@ const AddBom = () => {
   const existingBomRef = useRef(null);
   const editExistingRef = useRef(null);
   const formRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);
 
   const fetchProject = useCallback(async () => {
     if (!projectId) return;
@@ -167,6 +285,36 @@ const AddBom = () => {
     setRows((prev) => [...prev, createEmptyRow(baseSrNo + prev.length)]);
   };
 
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setError('');
+    setSuccess('');
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const bomSheetName = workbook.SheetNames.find((name) => String(name || '').trim().toLowerCase() === 'bom');
+      if (!bomSheetName) throw new Error('Sheet "BOM" not found in the uploaded file');
+
+      const parsedRows = parseWorksheetRows(workbook.Sheets[bomSheetName]);
+      const mappedRows = mapImportedRows(parsedRows, baseSrNo);
+      if (mappedRows.length === 0) {
+        throw new Error('No BOM rows found in sheet "BOM". Please make sure it has a header row and data rows.');
+      }
+
+      setRows(mappedRows);
+      setSuccess(`Imported ${mappedRows.length} BOM rows from ${file.name}`);
+      requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    } catch (err) {
+      setError(err.message || 'Failed to import BOM file');
+    } finally {
+      event.target.value = '';
+      setImporting(false);
+    }
+  };
+
   const removeRow = (idx) => {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   };
@@ -206,6 +354,7 @@ const AddBom = () => {
           totalPrice: derived.totalPrice,
           moq: toNumberOrZero(r.moq),
           remarks: r.remarks,
+          leadTime: r.leadTime || r.leadTimeWeeks,
           leadTimeWeeks: toNumberOrZero(r.leadTimeWeeks)
         };
       });
@@ -251,6 +400,7 @@ const AddBom = () => {
         additionalCost: toNumberOrZero(row.additionalCost),
         moq: toNumberOrZero(row.moq),
         remarks: row.remarks,
+        leadTime: row.leadTime || row.leadTimeWeeks,
         leadTimeWeeks: toNumberOrZero(row.leadTimeWeeks)
       };
       const res = await api.put(`/projects/${projectId}/bom/${row._id}`, payload);
@@ -379,15 +529,26 @@ const AddBom = () => {
                 <div className="text-xs text-gray-500 font-bold">{project.code}</div>
                 <div className="text-xs text-gray-500 font-bold mt-1">Existing BOM items: {project.bomItems?.length || 0}</div>
               </div>
-              <button
-                type="button"
-                onClick={addRow}
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50"
-                disabled={saving}
-              >
-                <PlusCircle className="h-4 w-4" />
-                Add Row
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 font-bold text-sm hover:bg-gray-50 transition-all disabled:opacity-50"
+                  disabled={saving || importing}
+                >
+                  <Upload className="h-4 w-4" />
+                  {importing ? 'Importing…' : 'Upload Excel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50"
+                  disabled={saving || importing}
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Add Row
+                </button>
+              </div>
             </div>
           ) : (
             <div className="text-sm text-gray-500 py-6">Project not found.</div>
@@ -410,33 +571,59 @@ const AddBom = () => {
               </button>
             </div>
             <div className="overflow-auto border border-gray-200 rounded-xl">
-              <table className="min-w-[1200px] w-full text-[11px]">
+              <table className="min-w-[2350px] w-full text-[11px]">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr className="text-[11px] font-black text-gray-700">
-                    <th className="px-2 py-2 text-left">Sr. No.</th>
                     <th className="px-2 py-2 text-left">Type of Component</th>
+                    <th className="px-2 py-2 text-left">Sr. No.</th>
+                    <th className="px-2 py-2 text-left">Supplier Name</th>
                     <th className="px-2 py-2 text-left">Nomenclature / Description</th>
+                    <th className="px-2 py-2 text-left">Part No. / Drg.</th>
+                    <th className="px-2 py-2 text-left">Make</th>
+                    <th className="px-2 py-2 text-left">Qty per Board</th>
+                    <th className="px-2 py-2 text-left">Board Req</th>
+                    <th className="px-2 py-2 text-left">Spare qty</th>
+                    <th className="px-2 py-2 text-left">Board Req with Spare</th>
                     <th className="px-2 py-2 text-left">Total Qty+Spare</th>
                     <th className="px-2 py-2 text-left">Unit cost</th>
+                    <th className="px-2 py-2 text-left">Additional cost</th>
                     <th className="px-2 py-2 text-left">Landing/unit</th>
                     <th className="px-2 py-2 text-left">Total price</th>
                     <th className="px-2 py-2 text-left">MOQ</th>
+                    <th className="px-2 py-2 text-left">Lead time</th>
                     <th className="px-2 py-2 text-left">Lead time (weeks)</th>
+                    <th className="px-2 py-2 text-left">Inventory Asset ID</th>
+                    <th className="px-2 py-2 text-left">Inventory SKU</th>
+                    <th className="px-2 py-2 text-left">Inventory Item Name</th>
+                    <th className="px-2 py-2 text-left">Planned Qty</th>
                     <th className="px-2 py-2 text-left">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {(project.bomItems || []).map((b) => (
                     <tr key={String(b._id || b.srNo)} className="align-top">
-                      <td className="px-2 py-2">{b.srNo}</td>
                       <td className="px-2 py-2">{b.typeOfComponent}</td>
+                      <td className="px-2 py-2">{b.srNo}</td>
+                      <td className="px-2 py-2">{b.supplierName || '-'}</td>
                       <td className="px-2 py-2">{b.nomenclatureDescription}</td>
+                      <td className="px-2 py-2">{b.partNoDrg || '-'}</td>
+                      <td className="px-2 py-2">{b.make || '-'}</td>
+                      <td className="px-2 py-2">{b.qtyPerBoard}</td>
+                      <td className="px-2 py-2">{b.boardReq}</td>
+                      <td className="px-2 py-2">{b.spareQty}</td>
+                      <td className="px-2 py-2">{b.boardReqWithSpare}</td>
                       <td className="px-2 py-2">{b.totalQtyWithSpare}</td>
                       <td className="px-2 py-2">{formatMoney(b.unitCost)}</td>
+                      <td className="px-2 py-2">{formatMoney(b.additionalCost)}</td>
                       <td className="px-2 py-2">{formatMoney(b.landingCostPerUnit)}</td>
                       <td className="px-2 py-2">{formatMoney(b.totalPrice)}</td>
                       <td className="px-2 py-2">{b.moq}</td>
+                      <td className="px-2 py-2">{b.leadTime || '-'}</td>
                       <td className="px-2 py-2">{b.leadTimeWeeks ?? 0}</td>
+                      <td className="px-2 py-2">{b.inventoryAssetId || '-'}</td>
+                      <td className="px-2 py-2">{b.inventorySku || '-'}</td>
+                      <td className="px-2 py-2">{b.inventoryItemName || '-'}</td>
+                      <td className="px-2 py-2">{b.plannedQty ?? 0}</td>
                       <td className="px-2 py-2">{b.remarks || '-'}</td>
                     </tr>
                   ))}
@@ -663,6 +850,45 @@ const AddBom = () => {
 
         {project ? (
           <form ref={formRef} onSubmit={handleSave} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,text/csv"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="text-sm font-extrabold text-gray-900">Import BOM from Excel</div>
+                  <div className="text-xs font-semibold text-gray-500">
+                    Upload `.xlsx`, `.xls`, or `.csv`. The file should contain a sheet named `BOM` with headers like `Type of Component`, `Sr. No.`,
+                    `Supplier Name`, `Nomenclature / Description`, `Qty per Board`, `Board Req`, `Spare qty`, `Unit cost`,
+                    `Additional cost`, `MOQ`, `Remarks`, and `Lead time`.
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50"
+                    disabled={saving || importing}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {importing ? 'Reading file…' : 'Choose File'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRows([createEmptyRow(baseSrNo)])}
+                    className="px-4 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 font-bold text-sm hover:bg-gray-100 transition-all disabled:opacity-50"
+                    disabled={saving || importing}
+                  >
+                    Clear Import
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="overflow-auto border border-gray-200 rounded-xl">
               <table className="min-w-[1700px] w-full text-xs">
                 <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
@@ -699,7 +925,6 @@ const AddBom = () => {
                             value={row.typeOfComponent}
                             onChange={(e) => setRows((prev) => prev.map((r, i) => i === idx ? { ...r, typeOfComponent: e.target.value } : r))}
                             className={cellClass}
-                            required={idx === 0}
                           />
                         </td>
                         <td className="px-2 py-2 min-w-[90px]">
@@ -722,7 +947,6 @@ const AddBom = () => {
                             value={row.nomenclatureDescription}
                             onChange={(e) => setRows((prev) => prev.map((r, i) => i === idx ? { ...r, nomenclatureDescription: e.target.value } : r))}
                             className={cellClass}
-                            required={idx === 0}
                           />
                         </td>
                         <td className="px-2 py-2 min-w-[150px]">

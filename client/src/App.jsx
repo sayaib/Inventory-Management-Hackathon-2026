@@ -2,7 +2,6 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
-import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 import WarehousePanel from './pages/WarehousePanel';
@@ -15,6 +14,7 @@ import Projects from './pages/Projects';
 import FinancePanel from './pages/FinancePanel';
 import BomDashboard from './pages/BomDashboard';
 import AddBom from './pages/AddBom';
+import ViewBom from './pages/ViewBom';
 import SubmittedBom from './pages/SubmittedBom';
 import BomChangeRequest from './pages/BomChangeRequest';
 
@@ -25,7 +25,6 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* User Protected Routes */}
@@ -35,6 +34,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/bom" element={<BomDashboard />} />
+            <Route path="/bom/:projectId/view" element={<ViewBom />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]} />}>

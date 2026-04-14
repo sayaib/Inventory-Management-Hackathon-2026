@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardList, ArrowLeft, Eye, Pencil, PlusCircle, X } from 'lucide-react';
+import { ClipboardList, ArrowLeft, Eye, Pencil, PlusCircle } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -11,12 +11,6 @@ const APP_LOGO_URL =
 const normalizeDepartment = (department) => {
   const next = typeof department === 'string' ? department.trim() : '';
   return next || 'Unassigned';
-};
-
-const formatMoney = (value) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return '0.00';
-  return parsed.toFixed(2);
 };
 
 const BomDashboard = () => {
@@ -30,10 +24,6 @@ const BomDashboard = () => {
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const userDept = normalizeDepartment(user?.profile?.department);
   const lockDepartment = isProjectManager && userDept !== 'Unassigned';
-  const [viewingProject, setViewingProject] = useState(null);
-  const [viewLoading, setViewLoading] = useState(false);
-  const [viewError, setViewError] = useState('');
-
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -78,27 +68,6 @@ const BomDashboard = () => {
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [projects, departmentFilter]);
-
-  const openViewBom = useCallback(async (projectId) => {
-    if (!projectId) return;
-    setViewLoading(true);
-    setViewError('');
-    try {
-      const res = await api.get(`/projects/${projectId}`);
-      setViewingProject(res.data?.project || null);
-    } catch (err) {
-      setViewError(err.response?.data?.message || 'Failed to load BOM');
-      setViewingProject(null);
-    } finally {
-      setViewLoading(false);
-    }
-  }, []);
-
-  const closeViewBom = () => {
-    setViewingProject(null);
-    setViewError('');
-    setViewLoading(false);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -207,15 +176,18 @@ const BomDashboard = () => {
                           <div className="flex flex-col items-end gap-2">
                             <div className="text-[10px] font-black uppercase tracking-wider text-gray-500">{p.status}</div>
                             <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openViewBom(p._id)}
-                                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50"
-                                disabled={(p.bomItems?.length || 0) === 0}
+                              <Link
+                                to={(p.bomItems?.length || 0) > 0 ? `/bom/${p._id}/view` : '#'}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs transition-all ${
+                                  (p.bomItems?.length || 0) > 0
+                                    ? 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                    : 'bg-gray-100 text-gray-400 pointer-events-none'
+                                }`}
+                                aria-disabled={(p.bomItems?.length || 0) === 0}
                               >
                                 <Eye className="h-4 w-4" />
                                 View BOM
-                              </button>
+                              </Link>
                               {canEditBom && (p.bomItems?.length || 0) > 0 ? (
                                 <Link
                                   to={`/bom/${p._id}/add?mode=edit`}
@@ -247,85 +219,6 @@ const BomDashboard = () => {
         </div>
       </main>
 
-      {viewingProject || viewLoading || viewError ? (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-auto"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) closeViewBom();
-          }}
-        >
-          <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl border border-gray-200 mt-10">
-            <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
-              <div>
-                <div className="text-base font-extrabold text-gray-900">BOM</div>
-                {viewingProject ? (
-                  <div className="text-xs text-gray-500 font-bold">
-                    {viewingProject.name} • {viewingProject.code} • Rows: {viewingProject.bomItems?.length || 0}
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={closeViewBom}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-700"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-5">
-              {viewLoading ? (
-                <div className="text-sm text-gray-500">Loading…</div>
-              ) : viewError ? (
-                <div className="bg-accent-50 border border-accent-100 text-accent-700 px-4 py-3 rounded-xl text-sm font-bold">
-                  {viewError}
-                </div>
-              ) : viewingProject && (viewingProject.bomItems?.length || 0) > 0 ? (
-                <div className="overflow-auto border border-gray-200 rounded-xl">
-                  <table className="min-w-[1200px] w-full text-[11px]">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr className="text-[11px] font-black text-gray-700">
-                        <th className="px-2 py-2 text-left">Sr. No.</th>
-                        <th className="px-2 py-2 text-left">Type of Component</th>
-                        <th className="px-2 py-2 text-left">Nomenclature / Description</th>
-                        <th className="px-2 py-2 text-left">Total Qty+Spare</th>
-                        <th className="px-2 py-2 text-left">Unit cost</th>
-                        <th className="px-2 py-2 text-left">Landing/unit</th>
-                        <th className="px-2 py-2 text-left">Total price</th>
-                        <th className="px-2 py-2 text-left">MOQ</th>
-                        <th className="px-2 py-2 text-left">Lead time (weeks)</th>
-                        <th className="px-2 py-2 text-left">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {(viewingProject.bomItems || [])
-                        .slice()
-                        .sort((a, b) => Number(a.srNo || 0) - Number(b.srNo || 0))
-                        .map((b) => (
-                          <tr key={String(b._id || b.srNo)} className="align-top">
-                            <td className="px-2 py-2">{b.srNo}</td>
-                            <td className="px-2 py-2">{b.typeOfComponent}</td>
-                            <td className="px-2 py-2">{b.nomenclatureDescription}</td>
-                            <td className="px-2 py-2">{b.totalQtyWithSpare}</td>
-                            <td className="px-2 py-2">{formatMoney(b.unitCost)}</td>
-                            <td className="px-2 py-2">{formatMoney(b.landingCostPerUnit)}</td>
-                            <td className="px-2 py-2">{formatMoney(b.totalPrice)}</td>
-                            <td className="px-2 py-2">{b.moq}</td>
-                            <td className="px-2 py-2">{b.leadTimeWeeks ?? 0}</td>
-                            <td className="px-2 py-2">{b.remarks || '-'}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">No BOM items found.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 };
