@@ -4,7 +4,6 @@ import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
-import WarehousePanel from './pages/WarehousePanel';
 import AssetManagement from './pages/AssetManagement';
 import Profile from './pages/Profile';
 import Unauthorized from './pages/Unauthorized';
@@ -52,11 +51,6 @@ function App() {
           {/* Admin Protected Routes */}
           <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route path="/admin" element={<AdminPanel />} />
-          </Route>
-
-          {/* Warehouse Protected Routes */}
-          <Route element={<ProtectedRoute allowedRoles={[ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]} />}>
-            <Route path="/warehouse" element={<WarehousePanel />} />
           </Route>
 
           {/* Finance Protected Routes */}

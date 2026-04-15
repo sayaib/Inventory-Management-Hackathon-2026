@@ -8,6 +8,7 @@ import {
   Eye,
   ArrowUpCircle,
   ArrowDownCircle,
+  ArrowUpDown,
   Plus, 
   Search, 
   Package, 
@@ -16,11 +17,9 @@ import {
   List as ListIcon, 
   ChevronRight, 
   ChevronDown,
-  Info,
   IndianRupee,
   MapPin,
   Calendar,
-  Activity,
   CheckCircle,
   AlertCircle,
   X,
@@ -39,22 +38,26 @@ const AssetManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [selectedDept, setSelectedDept] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [toast, setToast] = useState(null);
   
   const queryParams = new URLSearchParams(location.search);
   const viewOnlyMode = queryParams.get('mode') === 'view';
   const initialLowStock = queryParams.get('lowStock') === 'true';
 
-  const canEdit = user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.WAREHOUSE;
+  const canEdit = user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER;
   const canDelete = user?.role === ROLES.ADMIN;
-  const canAdd = (user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.WAREHOUSE) && !viewOnlyMode;
-  const canUpdateStock = user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.WAREHOUSE;
+  const canAdd = (user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER) && !viewOnlyMode;
+  const canUpdateStock = user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER;
   
   // Filtering and Pagination State
   const [filterDept, setFilterDept] = useState('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [showLowStockOnly, setShowLowStockOnly] = useState(initialLowStock);
+  const [sortKey, setSortKey] = useState('recent');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalAssets, setTotalAssets] = useState(0);
@@ -76,6 +79,34 @@ const AssetManagement = () => {
     const isLowStock = params.get('lowStock') === 'true';
     setShowLowStockOnly(isLowStock);
   }, [location.search]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchTerm(searchInput.trim());
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(confirmUpdate || viewAsset || barcodeAsset || assetToDelete);
+    if (!isAnyModalOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      if (assetToDelete) return setAssetToDelete(null);
+      if (barcodeAsset) return setBarcodeAsset(null);
+      if (viewAsset) return setViewAsset(null);
+      if (confirmUpdate) return setConfirmUpdate(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [assetToDelete, barcodeAsset, confirmUpdate, viewAsset]);
 
   const [formData, setFormData] = useState({
     itemName: '',
@@ -122,6 +153,11 @@ const AssetManagement = () => {
       setLowStockCount(res.data.lowStockCount);
     } catch (err) {
       console.error('Failed to fetch assets', err);
+      setToast({
+        type: 'error',
+        title: 'Failed to load inventory',
+        message: err.response?.data?.message || 'Please try again.'
+      });
     } finally {
       setLoading(false);
     }
@@ -164,6 +200,11 @@ const AssetManagement = () => {
       setSelectedDept('');
       setCurrentPage(1); 
       fetchAssets();
+      setToast({
+        type: 'success',
+        title: isEditing ? 'Asset updated' : 'Asset added',
+        message: 'Inventory view is refreshed.'
+      });
       // Reset form
       setFormData({
         itemName: '',
@@ -187,7 +228,11 @@ const AssetManagement = () => {
         metadata: {}
       });
     } catch (err) {
-      alert(err.response?.data?.message || `Failed to ${isEditing ? 'update' : 'add'} asset`);
+      setToast({
+        type: 'error',
+        title: `Failed to ${isEditing ? 'update' : 'add'} asset`,
+        message: err.response?.data?.message || 'Please check the fields and try again.'
+      });
     }
   };
 
@@ -230,8 +275,17 @@ const AssetManagement = () => {
       await api.delete(`/inventory/delete/${assetToDelete._id}`);
       setAssetToDelete(null);
       fetchAssets();
+      setToast({
+        type: 'success',
+        title: 'Asset deleted',
+        message: 'Inventory view is refreshed.'
+      });
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete asset');
+      setToast({
+        type: 'error',
+        title: 'Failed to delete asset',
+        message: err.response?.data?.message || 'Please try again.'
+      });
     }
   };
 
@@ -250,54 +304,131 @@ const AssetManagement = () => {
       });
       setConfirmUpdate(null);
       fetchAssets();
+      setToast({
+        type: 'success',
+        title: 'Stock updated',
+        message: `${asset.itemName} ${type === 'IN' ? '+1' : '-1'}`
+      });
     } catch (err) {
-      alert(err.response?.data?.message || 'Update failed');
+      setToast({
+        type: 'error',
+        title: 'Stock update failed',
+        message: err.response?.data?.message || 'Please try again.'
+      });
     }
   };
 
+  const hasActiveFilters =
+    filterDept !== 'All' || Boolean(startDate) || Boolean(endDate) || Boolean(showLowStockOnly) || Boolean(searchTerm);
+
+  const filteredBadgesCount =
+    Number(filterDept !== 'All') + Number(Boolean(startDate || endDate)) + Number(Boolean(showLowStockOnly)) + Number(Boolean(searchTerm));
+
+  const sortedAssets = (() => {
+    const list = [...assets];
+    switch (sortKey) {
+      case 'name_asc':
+        return list.sort((a, b) => String(a.itemName || '').localeCompare(String(b.itemName || ''), undefined, { sensitivity: 'base' }));
+      case 'stock_asc':
+        return list.sort((a, b) => Number(a.availableQuantity || 0) - Number(b.availableQuantity || 0));
+      case 'stock_desc':
+        return list.sort((a, b) => Number(b.availableQuantity || 0) - Number(a.availableQuantity || 0));
+      case 'value_desc':
+        return list.sort((a, b) => Number(b.purchaseCost || 0) - Number(a.purchaseCost || 0));
+      case 'recent':
+      default:
+        return list.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+    }
+  })();
+
+  const clearAllFilters = () => {
+    setFilterDept('All');
+    setStartDate('');
+    setEndDate('');
+    setSearchInput('');
+    setSearchTerm('');
+    setShowLowStockOnly(false);
+    setSortKey('recent');
+    setCurrentPage(1);
+  };
+
   return (
-    <div className="p-4 bg-gray-50 min-h-screen">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Asset Management</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Unified inventory system for all departments</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {canAdd && (
-              <button 
-                onClick={() => {
-                  setIsEditing(false);
-                  setShowForm(!showForm);
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm ${showForm ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-primary text-white hover:bg-primary-700 shadow-primary/10'}`}
-              >
-                {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {showForm ? 'Close Form' : 'Add Asset'}
-              </button>
-            )}
-            {(user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.ADMIN) && (
-              <Link
-                to="/inventory/submitted-bom"
-                className="px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-primary border border-primary-200 hover:bg-primary-50"
-              >
-                Submitted BOM
-              </Link>
-            )}
-            <div className="flex bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-              <button 
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-primary-50 text-primary shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button 
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-primary-50 text-primary shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
-              >
-                <ListIcon className="h-4 w-4" />
-              </button>
+    <div className="min-h-screen bg-gradient-to-b from-primary-50/40 via-white to-muted-50/40 p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6 rounded-3xl border border-primary-100 bg-white/70 backdrop-blur p-5 sm:p-6 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-2xl bg-primary text-white shadow-lg shadow-primary/10">
+                <Package className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Inventory Management</h1>
+                <p className="text-sm text-gray-600 mt-1">Track stock health, valuation, and movement across departments</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {viewOnlyMode && (
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-slate-700">
+                      View-only mode
+                    </span>
+                  )}
+                  {hasActiveFilters && (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-2.5 py-1 text-[11px] font-extrabold text-primary-800">
+                      Filters active ({filteredBadgesCount})
+                      <button
+                        type="button"
+                        onClick={clearAllFilters}
+                        className="p-0.5 rounded-full hover:bg-primary-100 transition-all"
+                        aria-label="Clear all filters"
+                      >
+                        <X className="h-3.5 w-3.5 opacity-70" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                <button 
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-primary-50 text-primary shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
+                  aria-label="Grid view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-primary-50 text-primary shadow-inner' : 'text-gray-400 hover:text-gray-600'}`}
+                  aria-label="List view"
+                >
+                  <ListIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              {(user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.ADMIN) && (
+                <Link
+                  to="/inventory/submitted-bom"
+                  className="px-4 py-2 rounded-xl font-extrabold text-sm transition-all shadow-sm bg-white text-primary border border-primary-200 hover:bg-primary-50"
+                >
+                  Submitted BOM
+                </Link>
+              )}
+
+              {canAdd && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setShowForm(!showForm);
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-extrabold text-sm transition-all shadow-sm ${showForm ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-primary text-white hover:bg-primary-700 shadow-primary/10'}`}
+                >
+                  {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                  {showForm ? 'Close Form' : 'Add Asset'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -460,147 +591,337 @@ const AssetManagement = () => {
           </div>
         )}
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-primary-200 transition-all duration-300">
-            <div className="p-3 bg-primary-50 text-primary rounded-xl group-hover:bg-primary group-hover:text-white transition-colors">
-              <Package className="h-6 w-6" />
-            </div>
+        <div className="mb-6 rounded-3xl border border-gray-100 bg-white p-4 sm:p-5 shadow-sm">
+          <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Assets</p>
-              <p className="text-xl font-black text-gray-900">{totalAssets}</p>
+              <h2 className="text-sm font-extrabold text-gray-900 tracking-tight">Overview</h2>
+              <p className="text-[11px] text-gray-500 mt-0.5">A quick snapshot of what needs attention right now.</p>
             </div>
-          </div>
-          
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-muted-200 transition-all duration-300">
-            <div className="p-3 bg-muted-50 text-muted-800 rounded-xl group-hover:bg-muted group-hover:text-white transition-colors">
-              <CheckCircle className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Active Units</p>
-              <p className="text-xl font-black text-gray-900">{activeCount}</p>
+            <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-gray-500">
+              <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1">
+                Showing <span className="ml-1 text-gray-900 font-black">{assets.length}</span> / {totalAssets}
+              </span>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-red-200 transition-all duration-300">
-            <div className="p-3 bg-red-50 text-red-600 rounded-xl group-hover:bg-red-600 group-hover:text-white transition-colors">
-              <AlertCircle className="h-6 w-6" />
+          <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-white to-primary-50/40 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 bg-primary-50 text-primary rounded-xl">
+                  <Package className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Total Assets</p>
+              <p className="text-2xl font-black text-gray-900">{totalAssets}</p>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Low Stock</p>
-              <p className={`text-xl font-black ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>{lowStockCount}</p>
+            
+            <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-white to-muted-50/60 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 bg-muted-50 text-muted-800 rounded-xl">
+                  <CheckCircle className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Active Units</p>
+              <p className="text-2xl font-black text-gray-900">{activeCount}</p>
             </div>
-          </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 group hover:border-primary-200 transition-all duration-300">
-            <div className="p-3 bg-primary-50 text-primary rounded-xl group-hover:bg-primary group-hover:text-white transition-colors">
-              <IndianRupee className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Value</p>
-              <p className="text-xl font-black text-gray-900">{totalValue.toLocaleString()}</p>
+            <button
+              type="button"
+              onClick={() => { setShowLowStockOnly((v) => !v); setCurrentPage(1); }}
+              className={`text-left rounded-2xl border bg-gradient-to-br from-white to-red-50/40 p-4 hover:shadow-md transition-all ${
+                showLowStockOnly ? 'border-red-200 ring-2 ring-red-100' : 'border-gray-100'
+              }`}
+              title="Toggle low stock filter"
+            >
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 bg-red-50 text-red-600 rounded-xl">
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Low Stock</p>
+              <p className={`text-2xl font-black ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>{lowStockCount}</p>
+              <p className="mt-1 text-[11px] font-bold text-gray-500">Tap to {showLowStockOnly ? 'show all' : 'filter'}</p>
+            </button>
+
+            <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-white to-primary-50/40 p-4 hover:shadow-md transition-all">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 bg-primary-50 text-primary rounded-xl">
+                  <IndianRupee className="h-5 w-5" />
+                </div>
+              </div>
+              <p className="mt-3 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Total Value</p>
+              <p className="text-2xl font-black text-gray-900">{totalValue.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
         {/* Filters and Search Bar */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <div className="relative col-span-1 md:col-span-1.5">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search inventory..." 
-                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm font-medium transition-all"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              />
+        <div className="sticky top-4 z-20 bg-white/75 backdrop-blur p-4 rounded-3xl shadow-sm border border-gray-100 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-primary-50 text-primary rounded-xl">
+                <Filter className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-extrabold text-gray-900 tracking-tight">Filters</p>
+                <p className="text-[11px] text-gray-500">Refine the inventory list without losing context</p>
+              </div>
             </div>
-            
-            <div className="relative">
-              <select 
-                className="w-full pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none appearance-none text-sm font-bold text-gray-600 cursor-pointer"
-                value={filterDept}
-                onChange={(e) => { setFilterDept(e.target.value); setCurrentPage(1); }}
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="hidden sm:inline-flex px-3 py-2 rounded-xl text-xs font-extrabold bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((v) => !v)}
+                className="sm:hidden px-3 py-2 rounded-xl text-xs font-extrabold bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all"
               >
-                <option value="All">All Departments</option>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+                {filtersOpen ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+
+          <div className={`${filtersOpen ? 'block' : 'hidden'} sm:block`}>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <div className="relative col-span-1 md:col-span-1.5">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchInput('')}
+                    className="absolute right-2 top-2 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <input 
+                  type="text" 
+                  placeholder="Search by name, asset ID, or SKU..." 
+                  className="w-full pl-9 pr-9 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none text-sm font-medium transition-all"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                />
+              </div>
+              
+              <div className="relative">
+                <select 
+                  className="w-full pl-3 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary outline-none appearance-none text-sm font-bold text-gray-600 cursor-pointer"
+                  value={filterDept}
+                  onChange={(e) => { setFilterDept(e.target.value); setCurrentPage(1); }}
+                >
+                  <option value="All">All Departments</option>
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
+
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <input 
+                  type="date" 
+                  className="bg-transparent outline-none text-xs font-bold text-gray-600 w-full"
+                  value={startDate}
+                  max={endDate || undefined}
+                  onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <input 
+                  type="date" 
+                  className="bg-transparent outline-none text-xs font-bold text-gray-600 w-full"
+                  value={endDate}
+                  min={startDate || undefined}
+                  onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                />
+              </div>
+
+              <button 
+                type="button"
+                onClick={() => { setShowLowStockOnly(!showLowStockOnly); setCurrentPage(1); }}
+                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all font-bold text-xs ${
+                  showLowStockOnly 
+                    ? 'bg-red-600 border-red-600 text-white shadow-md shadow-red-100' 
+                    : 'bg-white border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500'
+                }`}
+              >
+                <ShieldAlert className={`h-4 w-4 ${showLowStockOnly ? 'animate-pulse' : ''}`} />
+                Low Stock
+              </button>
             </div>
 
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
-              <Calendar className="h-4 w-4 text-gray-400" />
-              <input 
-                type="date" 
-                className="bg-transparent outline-none text-xs font-bold text-gray-600 w-full"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
-              />
+            <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex-1 flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 w-full sm:w-auto">
+                  <ArrowUpDown className="h-4 w-4 text-gray-400" />
+                  <select
+                    className="bg-transparent outline-none text-xs font-extrabold text-gray-700 w-full cursor-pointer"
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value)}
+                    aria-label="Sort"
+                  >
+                    <option value="recent">Recently updated</option>
+                    <option value="name_asc">Name A → Z</option>
+                    <option value="stock_asc">Stock low → high</option>
+                    <option value="stock_desc">Stock high → low</option>
+                    <option value="value_desc">Value high → low</option>
+                  </select>
+                </div>
+              </div>
+              <div className="text-[11px] font-bold text-gray-500 flex items-center justify-between sm:justify-end gap-2">
+                <span className="sm:hidden">Showing <span className="text-gray-900 font-black">{assets.length}</span> / {totalAssets}</span>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="px-3 py-2 rounded-xl text-[11px] font-extrabold bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl">
-              <Calendar className="h-4 w-4 text-gray-400" />
-              <input 
-                type="date" 
-                className="bg-transparent outline-none text-xs font-bold text-gray-600 w-full"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
-              />
-            </div>
+            {hasActiveFilters && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchInput(''); setSearchTerm(''); }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 text-primary-800 border border-primary-100 text-[11px] font-extrabold"
+                    title="Remove search filter"
+                  >
+                    Search: “{searchTerm}” <X className="h-3.5 w-3.5 opacity-60" />
+                  </button>
+                )}
+                {filterDept !== 'All' && (
+                  <button
+                    type="button"
+                    onClick={() => { setFilterDept('All'); setCurrentPage(1); }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200 text-[11px] font-extrabold"
+                    title="Remove department filter"
+                  >
+                    Dept: {filterDept} <X className="h-3.5 w-3.5 opacity-60" />
+                  </button>
+                )}
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => { setStartDate(''); setEndDate(''); setCurrentPage(1); }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200 text-[11px] font-extrabold"
+                    title="Remove date range filter"
+                  >
+                    Date: {startDate || '…'} → {endDate || '…'} <X className="h-3.5 w-3.5 opacity-60" />
+                  </button>
+                )}
+                {showLowStockOnly && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowLowStockOnly(false); setCurrentPage(1); }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-100 text-[11px] font-extrabold"
+                    title="Remove low stock filter"
+                  >
+                    Low stock <X className="h-3.5 w-3.5 opacity-60" />
+                  </button>
+                )}
 
-            <button 
-              onClick={() => { setShowLowStockOnly(!showLowStockOnly); setCurrentPage(1); }}
-              className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl border transition-all font-bold text-xs ${
-                showLowStockOnly 
-                  ? 'bg-red-600 border-red-600 text-white shadow-md shadow-red-100' 
-                  : 'bg-white border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-500'
-              }`}
-            >
-              <ShieldAlert className={`h-4 w-4 ${showLowStockOnly ? 'animate-pulse' : ''}`} />
-              Low Stock
-            </button>
+                <div className="flex-1" />
+
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="sm:hidden px-3 py-1.5 rounded-xl text-[11px] font-extrabold bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="text-xs font-bold text-gray-500">
+            Page <span className="text-gray-900 font-black">{currentPage}</span> of <span className="text-gray-900 font-black">{totalPages}</span>
+          </div>
+          <div className="text-xs font-bold text-gray-500">
+            Showing <span className="text-gray-900 font-black">{assets.length}</span> / <span className="text-gray-900 font-black">{totalAssets}</span>
           </div>
         </div>
 
         {/* Asset Grid/List */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
+            {Array.from({ length: itemsPerPage }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`bg-white border border-gray-100 shadow-sm ${viewMode === 'grid' ? 'rounded-2xl p-5' : 'rounded-xl p-3'} animate-pulse`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-xl bg-gray-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-2/3 bg-gray-100 rounded" />
+                    <div className="h-2.5 w-1/2 bg-gray-100 rounded" />
+                  </div>
+                  {viewMode === 'list' && <div className="h-6 w-20 bg-gray-100 rounded-lg" />}
+                </div>
+                {viewMode === 'grid' && (
+                  <div className="mt-4 pt-4 border-t border-gray-50 grid grid-cols-2 gap-3">
+                    <div className="h-8 bg-gray-100 rounded-xl" />
+                    <div className="h-8 bg-gray-100 rounded-xl" />
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         ) : (
           <>
-            <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
-              {assets.length === 0 ? (
+            {assets.length === 0 ? (
                 <div className="col-span-full py-20 text-center text-gray-400 italic bg-white rounded-3xl border border-gray-100 shadow-sm">
                   <Package className="h-12 w-12 mx-auto mb-4 opacity-10" />
                   <p className="text-sm font-bold uppercase tracking-widest">No matching inventory</p>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="mt-6 inline-flex px-4 py-2 rounded-xl bg-gray-50 text-gray-700 font-extrabold text-xs hover:bg-gray-100 transition-all"
+                    >
+                      Clear filters
+                    </button>
+                  )}
                 </div>
-              ) : (
-                assets.map(asset => (
-                  <div key={asset._id} className={`bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-100 transition-all duration-300 ${viewMode === 'grid' ? 'rounded-2xl p-5' : 'rounded-xl p-3 flex items-center justify-between gap-4'}`}>
-                    <div className="flex items-center space-x-4 flex-1 min-w-0">
-                      <div className={`p-2.5 rounded-xl flex-shrink-0 ${asset.availableQuantity <= (asset.lowStockThreshold || 5) ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary'}`}>
-                        <Package className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-2">
-                          <h3 className="font-bold text-gray-900 text-sm truncate">{asset.itemName}</h3>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sortedAssets.map((asset) => {
+                  const isLow = Number(asset.availableQuantity || 0) <= Number(asset.lowStockThreshold || 5);
+                  const total = Math.max(1, Number(asset.totalQuantity || 0));
+                  const pct = Math.min(100, Math.max(0, Math.round((Number(asset.availableQuantity || 0) / total) * 100)));
+                  return (
+                    <div
+                      key={asset._id}
+                      className="bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-primary-100 transition-all duration-300 rounded-3xl p-5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`p-2.5 rounded-2xl flex-shrink-0 ${isLow ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary'}`}>
+                            <Package className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-extrabold text-gray-900 text-sm truncate">{asset.itemName}</h3>
+                            <p className="text-[10px] text-gray-400 font-extrabold uppercase tracking-tighter mt-0.5 truncate">
+                              {asset.assetId} • {asset.category}
+                            </p>
+                          </div>
                         </div>
-                        <div className="flex items-center text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-0.5">
-                          {asset.assetId} • {asset.category}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className={viewMode === 'grid' ? "mt-4 grid grid-cols-2 gap-3 border-t border-gray-50 pt-4" : "flex items-center space-x-6 flex-shrink-0"}>
-                      <div className="hidden md:flex items-center text-[11px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg">
-                        <MapPin className="h-3 w-3 mr-1.5 opacity-40" />
-                        {asset.location}
-                      </div>
-                      
-                      <div className="flex items-center">
-                        <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-tight ${
+                        <span className={`px-2 py-1 rounded-xl text-[10px] font-extrabold uppercase tracking-tight ${
                           asset.status === 'active' ? 'bg-primary-50 text-primary-700' : 
                           asset.status === 'damaged' ? 'bg-accent-50 text-accent-700' : 'bg-muted-50 text-muted-800'
                         }`}>
@@ -608,75 +929,244 @@ const AssetManagement = () => {
                         </span>
                       </div>
 
-                      <div className="flex flex-col items-end min-w-[80px]">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-sm font-black ${asset.availableQuantity <= (asset.lowStockThreshold || 5) ? 'text-red-600' : 'text-gray-900'}`}>
-                            {asset.availableQuantity}
-                          </span>
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">/ {asset.totalQuantity}</span>
-                        </div>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase leading-none">{asset.unit}</p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                          {asset.department}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                          <MapPin className="h-3.5 w-3.5 opacity-50" />
+                          {asset.location}
+                        </span>
                       </div>
-                      
-                      {/* Quick Actions for List View */}
-                      {viewMode === 'list' && (
-                        <div className="flex items-center gap-1 ml-2">
+
+                      <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Available</p>
+                          <p className="text-xs font-extrabold text-gray-700">
+                            {asset.availableQuantity} <span className="text-[10px] text-gray-400">/ {asset.totalQuantity} {asset.unit}</span>
+                          </p>
+                        </div>
+                        <div className="mt-2 h-2 rounded-full bg-white overflow-hidden border border-gray-100">
+                          <div className={`h-full ${isLow ? 'bg-red-500' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
                           <button 
+                            type="button"
                             onClick={() => setViewAsset(asset)}
-                            title="View Details"
-                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-all"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold bg-primary-50 text-primary-800 hover:bg-primary-100 transition-all"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4" /> Details
                           </button>
                           <button 
+                            type="button"
                             onClick={() => setBarcodeAsset(asset)}
-                            title="View Barcode"
-                            className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-all"
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold bg-gray-50 text-gray-700 hover:bg-gray-100 transition-all"
                           >
-                            <BarcodeIcon className="h-4 w-4" />
+                            <BarcodeIcon className="h-4 w-4" /> Barcode
                           </button>
+                        </div>
+
+                        <div className="flex items-center gap-1">
                           {canEdit && (
                             <button 
+                              type="button"
                               onClick={() => handleEdit(asset)}
                               title="Edit Item"
-                              className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary-50 rounded-lg transition-all"
+                              className="p-2 text-gray-500 hover:text-primary hover:bg-primary-50 rounded-xl transition-all"
+                              aria-label="Edit asset"
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
                           )}
                           {canDelete && (
                             <button 
+                              type="button"
                               onClick={() => handleDelete(asset)}
                               title="Delete Item"
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                              aria-label="Delete asset"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           )}
-                          <div className="h-4 w-px bg-gray-100 mx-1"></div>
                           {canUpdateStock && (
                             <>
                               <button 
+                                type="button"
                                 onClick={() => handleQuickStockUpdate(asset, 'IN')}
-                                className="p-1.5 text-primary hover:bg-primary-50 rounded-lg transition-all"
+                                title="Stock In (+1)"
+                                className="p-2 text-primary hover:bg-primary-50 rounded-xl transition-all"
+                                aria-label="Stock in"
                               >
                                 <ArrowUpCircle className="h-4 w-4" />
                               </button>
                               <button 
+                                type="button"
                                 onClick={() => handleQuickStockUpdate(asset, 'OUT')}
-                                className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-all"
+                                title="Stock Out (-1)"
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                aria-label="Stock out"
                               >
                                 <ArrowDownCircle className="h-4 w-4" />
                               </button>
                             </>
                           )}
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
+                <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_.9fr_.9fr_1.2fr] gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
+                  <div>Item</div>
+                  <div>Department</div>
+                  <div>Location</div>
+                  <div>Status</div>
+                  <div className="text-right">Stock</div>
+                  <div className="text-right">Actions</div>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  {sortedAssets.map((asset) => {
+                    const isLow = Number(asset.availableQuantity || 0) <= Number(asset.lowStockThreshold || 5);
+                    const total = Math.max(1, Number(asset.totalQuantity || 0));
+                    const pct = Math.min(100, Math.max(0, Math.round((Number(asset.availableQuantity || 0) / total) * 100)));
+                    return (
+                      <div key={asset._id} className="px-4 sm:px-5 py-4 hover:bg-gray-50/70 transition-all">
+                        <div className="grid grid-cols-1 md:grid-cols-[1.6fr_1fr_1fr_.9fr_.9fr_1.2fr] gap-3 items-center">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className={`p-2.5 rounded-2xl flex-shrink-0 ${isLow ? 'bg-red-50 text-red-600' : 'bg-primary-50 text-primary'}`}>
+                              <Package className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-gray-900 text-sm truncate">{asset.itemName}</p>
+                              <p className="text-[10px] text-gray-400 font-extrabold uppercase tracking-tighter mt-0.5 truncate">
+                                {asset.assetId} • {asset.category}
+                              </p>
+                              <div className="mt-2 flex flex-wrap items-center gap-2 md:hidden">
+                                <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                                  {asset.department}
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                                  <MapPin className="h-3.5 w-3.5 opacity-50" />
+                                  {asset.location}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="hidden md:block">
+                            <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                              {asset.department}
+                            </span>
+                          </div>
+
+                          <div className="hidden md:flex items-center gap-1 text-xs font-extrabold text-gray-700">
+                            <MapPin className="h-4 w-4 opacity-40" />
+                            <span className="truncate">{asset.location}</span>
+                          </div>
+
+                          <div className="hidden md:block">
+                            <span className={`px-2 py-1 rounded-xl text-[10px] font-extrabold uppercase tracking-tight ${
+                              asset.status === 'active' ? 'bg-primary-50 text-primary-700' : 
+                              asset.status === 'damaged' ? 'bg-accent-50 text-accent-700' : 'bg-muted-50 text-muted-800'
+                            }`}>
+                              {asset.status}
+                            </span>
+                          </div>
+
+                          <div className="md:text-right">
+                            <div className="flex md:flex-col items-center md:items-end justify-between gap-2">
+                              <div className="flex items-baseline gap-2">
+                                <span className={`text-sm font-black ${isLow ? 'text-red-600' : 'text-gray-900'}`}>{asset.availableQuantity}</span>
+                                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-tighter">/ {asset.totalQuantity}</span>
+                                <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-tighter">{asset.unit}</span>
+                              </div>
+                              <div className="hidden md:block w-full max-w-[140px]">
+                                <div className="h-2 rounded-full bg-white overflow-hidden border border-gray-100">
+                                  <div className={`h-full ${isLow ? 'bg-red-500' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-1">
+                            <button 
+                              type="button"
+                              onClick={() => setViewAsset(asset)}
+                              title="View Details"
+                              className="p-2 text-gray-500 hover:text-primary hover:bg-primary-50 rounded-xl transition-all"
+                              aria-label="View details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => setBarcodeAsset(asset)}
+                              title="View Barcode"
+                              className="p-2 text-gray-500 hover:text-primary hover:bg-primary-50 rounded-xl transition-all"
+                              aria-label="View barcode"
+                            >
+                              <BarcodeIcon className="h-4 w-4" />
+                            </button>
+                            {canEdit && (
+                              <button 
+                                type="button"
+                                onClick={() => handleEdit(asset)}
+                                title="Edit Item"
+                                className="p-2 text-gray-500 hover:text-primary hover:bg-primary-50 rounded-xl transition-all"
+                                aria-label="Edit item"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button 
+                                type="button"
+                                onClick={() => handleDelete(asset)}
+                                title="Delete Item"
+                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                aria-label="Delete item"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            <div className="h-5 w-px bg-gray-100 mx-1" />
+                            {canUpdateStock && (
+                              <>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleQuickStockUpdate(asset, 'IN')}
+                                  title="Stock In (+1)"
+                                  className="p-2 text-primary hover:bg-primary-50 rounded-xl transition-all"
+                                  aria-label="Stock in"
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                </button>
+                                <button 
+                                  type="button"
+                                  onClick={() => handleQuickStockUpdate(asset, 'OUT')}
+                                  title="Stock Out (-1)"
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                  aria-label="Stock out"
+                                >
+                                  <ArrowDownCircle className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
@@ -703,10 +1193,48 @@ const AssetManagement = () => {
           </>
         )}
       </div>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-[60] w-[92vw] max-w-sm">
+          <div
+            className={`rounded-2xl border shadow-2xl backdrop-blur bg-white/90 p-4 ${
+              toast.type === 'success' ? 'border-primary-100' : 'border-red-100'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2 rounded-xl ${
+                  toast.type === 'success' ? 'bg-primary-50 text-primary' : 'bg-red-50 text-red-600'
+                }`}
+              >
+                {toast.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-gray-900">{toast.title}</p>
+                {toast.message && <p className="text-xs text-gray-600 mt-0.5">{toast.message}</p>}
+              </div>
+              <button
+                onClick={() => setToast(null)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                aria-label="Close notification"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal */}
       {confirmUpdate && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setConfirmUpdate(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 mb-4">
               <div className={`p-2 rounded-lg ${confirmUpdate.type === 'IN' ? 'bg-primary-50 text-primary' : 'bg-accent-50 text-accent'}`}>
                 {confirmUpdate.type === 'IN' ? <ArrowUpCircle className="h-6 w-6" /> : <ArrowDownCircle className="h-6 w-6" />}
@@ -763,8 +1291,14 @@ const AssetManagement = () => {
 
       {/* View Asset Detail Modal */}
       {viewAsset && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setViewAsset(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-primary text-white rounded-xl shadow-lg shadow-primary/10">
@@ -855,11 +1389,29 @@ const AssetManagement = () => {
               <button 
                 onClick={() => {
                   setViewAsset(null);
+                  handleQuickStockUpdate(viewAsset, 'OUT');
+                }}
+                className="px-4 py-2.5 bg-accent text-white font-bold rounded-xl hover:bg-accent-700 transition-all text-sm shadow-md"
+              >
+                Stock Out (-1)
+              </button>
+              <button 
+                onClick={() => {
+                  setViewAsset(null);
                   handleQuickStockUpdate(viewAsset, 'IN');
                 }}
                 className="px-4 py-2.5 bg-primary text-white font-bold rounded-xl hover:bg-primary-700 transition-all text-sm shadow-md"
               >
                 Stock In (+1)
+              </button>
+              <button 
+                onClick={() => {
+                  setBarcodeAsset(viewAsset);
+                  setViewAsset(null);
+                }}
+                className="px-4 py-2.5 bg-white border border-gray-200 text-gray-600 font-bold rounded-xl hover:bg-gray-100 transition-all text-sm shadow-sm"
+              >
+                Barcode
               </button>
               <button 
                 onClick={() => setViewAsset(null)}
@@ -874,8 +1426,14 @@ const AssetManagement = () => {
 
       {/* Barcode Modal */}
       {barcodeAsset && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setBarcodeAsset(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="text-center space-y-6">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Item Barcode</h3>
@@ -917,8 +1475,14 @@ const AssetManagement = () => {
 
       {/* Delete Confirmation Modal */}
       {assetToDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setAssetToDelete(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 mb-4 text-red-600">
               <div className="p-2 bg-red-50 rounded-lg">
                 <Trash2 className="h-6 w-6" />

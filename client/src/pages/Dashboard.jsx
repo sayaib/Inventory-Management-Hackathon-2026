@@ -5,9 +5,7 @@ import {
   LayoutDashboard, 
   LogOut, 
   User as UserIcon, 
-  Package, 
   Shield,
-  Activity,
   AlertTriangle,
   Boxes,
   Briefcase,
@@ -26,7 +24,6 @@ const Dashboard = () => {
 
   const isInventoryManager = user?.role === ROLES.INVENTORY_MANAGER;
   const isAdmin = user?.role === ROLES.ADMIN;
-  const isWarehouse = user?.role === ROLES.WAREHOUSE;
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const isSalesHead = user?.role === ROLES.SALES_HEAD;
   const isPresale = user?.role === ROLES.PRESALE;
@@ -48,26 +45,6 @@ const Dashboard = () => {
       primaryAction: 'bg-primary text-white hover:bg-primary-700 shadow-md shadow-primary/10',
       secondaryAction: 'bg-white text-primary border border-primary-200 hover:bg-primary-50 shadow-sm'
     };
-
-    if (isWarehouse) {
-      return {
-        ...base,
-        pageBg: 'bg-gradient-to-b from-accent-50 via-white to-muted-50',
-        brandBg: 'bg-accent',
-        badge: 'bg-accent-100 text-accent-800',
-        linkHover: 'hover:text-accent-700',
-        heroBorder: 'border-accent-200',
-        heroAccent: 'text-accent-700',
-        heroIconBg: 'bg-accent/10 text-accent-700',
-        heroTitle: 'Warehouse Operations',
-        heroSubtitle: "Scan, update, and sync stock movement with minimal clicks.",
-        layout: 'split',
-        actionsTitle: 'Shift Tools',
-        actionsIconClass: 'text-accent-700',
-        primaryAction: 'bg-accent text-white hover:bg-accent-700 shadow-md shadow-accent/10',
-        secondaryAction: 'bg-white text-accent-700 border border-accent-200 hover:bg-accent-50 shadow-sm'
-      };
-    }
 
     if (isFinance) {
       return {
@@ -193,8 +170,6 @@ const Dashboard = () => {
                   <ClipboardList className="h-6 w-6" />
                 ) : isProjectManager ? (
                   <Briefcase className="h-6 w-6" />
-                ) : isWarehouse ? (
-                  <Package className="h-6 w-6" />
                 ) : isProcurement ? (
                   <Boxes className="h-6 w-6" />
                 ) : (
@@ -259,20 +234,6 @@ const Dashboard = () => {
                 </div>
                 <h3 className="mt-4 text-lg font-extrabold text-slate-900">Submitted BOM</h3>
                 <p className="text-sm text-slate-600 mt-1">View submitted BOMs grouped by department.</p>
-              </Link>
-
-              <Link
-                to="/warehouse?tab=history"
-                className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="p-3 bg-muted/10 rounded-xl w-fit group-hover:bg-muted/15 transition-colors">
-                    <Activity className="h-6 w-6 text-muted-800" />
-                  </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Movement</span>
-                </div>
-                <h3 className="mt-4 text-lg font-extrabold text-slate-900">Track Consumption</h3>
-                <p className="text-sm text-slate-600 mt-1">Log stock usage and track material movement.</p>
               </Link>
 
               <Link
@@ -438,17 +399,15 @@ const Dashboard = () => {
           </section>
         )}
 
-        {(isWarehouse || isProcurement) && !isInventoryManager && !isFinance && !isProjectManager && !isAdmin && (
+        {isProcurement && !isInventoryManager && !isFinance && !isProjectManager && !isAdmin && (
           <section className="mb-8">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-white/80 backdrop-blur p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className={`text-base font-extrabold ${roleUi.heroAccent}`}>
-                  {isWarehouse ? 'Start your shift' : 'Get started'}
+                  Get started
                 </div>
                 <p className="mt-1 text-sm text-slate-600">
-                  {isWarehouse
-                    ? 'Fast access to scanning and stock updates.'
-                    : 'Review inventory and move into detailed management when needed.'}
+                  Review inventory and move into detailed management when needed.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {roleFeatures.slice(0, 4).map((f) => (
@@ -468,9 +427,7 @@ const Dashboard = () => {
                 </div>
                 <div className="mt-2 text-sm font-bold text-slate-700 uppercase tracking-wider">{roleLabel}</div>
                 <div className="mt-3 text-sm text-slate-600">
-                  {isWarehouse
-                    ? 'Designed for quick, repeatable operational tasks.'
-                    : 'Designed for planning and purchasing signals.'}
+                  Designed for planning and purchasing signals.
                 </div>
               </div>
             </div>
@@ -490,15 +447,6 @@ const Dashboard = () => {
             </div>
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(isWarehouse || isAdmin || isInventoryManager) && (
-                  <Link
-                    to="/warehouse"
-                    className={`p-5 font-extrabold rounded-2xl transition-all flex flex-col items-center justify-center text-center group ${roleUi.primaryAction}`}
-                  >
-                    <Package className="h-8 w-8 mb-3 group-hover:scale-110 transition-transform" />
-                    <span className="text-base">Quick Stock Update (QR/Barcode)</span>
-                  </Link>
-                )}
                 <Link
                   to="/inventory"
                   className={`p-5 font-extrabold rounded-2xl transition-all flex flex-col items-center justify-center text-center group ${roleUi.secondaryAction}`}

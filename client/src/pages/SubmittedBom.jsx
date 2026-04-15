@@ -26,6 +26,32 @@ const formatQty = (value) => {
   return n.toFixed(2);
 };
 
+const formatMoney = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0.00';
+  return n.toFixed(2);
+};
+
+const computeDerived = ({ qtyPerBoard, boardReq, spareQty, unitCost, additionalCost }) => {
+  const qpb = Math.max(0, toNumberOrZero(qtyPerBoard));
+  const br = Math.max(0, toNumberOrZero(boardReq));
+  const sq = Math.max(0, toNumberOrZero(spareQty));
+  const boardReqWithSpare = Math.max(0, br + sq);
+  const totalQtyWithSpare = Math.max(0, qpb * boardReqWithSpare);
+
+  const uc = Math.max(0, toNumberOrZero(unitCost));
+  const ac = Math.max(0, toNumberOrZero(additionalCost));
+  const landingCostPerUnit = Math.max(0, uc + ac);
+  const totalPrice = Math.max(0, landingCostPerUnit * totalQtyWithSpare);
+
+  return {
+    boardReqWithSpare,
+    totalQtyWithSpare,
+    landingCostPerUnit,
+    totalPrice
+  };
+};
+
 const getUtilizationMeta = ({ hasLink, plannedQty, usedQty }) => {
   const planned = Math.max(0, toNumberOrZero(plannedQty));
   const used = Math.max(0, toNumberOrZero(usedQty));
@@ -109,6 +135,7 @@ const SubmittedBom = () => {
   }, [fetchProjects]);
 
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
+  const isInventoryManager = user?.role === ROLES.INVENTORY_MANAGER;
   const userDept = normalizeDepartment(user?.profile?.department);
   const lockDepartment = isProjectManager && userDept !== 'Unassigned';
 
@@ -284,25 +311,33 @@ const SubmittedBom = () => {
     const rowKey = getRowKey(projectId, bomItem?._id || rowIndex);
     const plan = rowPlans[rowKey] || {};
     const selectedAsset = plan.selectedAsset;
-    const plannedQty = toNumberOrZero(plan.plannedQty ?? bomItem?.plannedQty ?? bomItem?.totalQtyWithSpare ?? 0);
+    const plannedQty = Math.max(0, toNumberOrZero(plan.plannedQty ?? bomItem?.plannedQty ?? bomItem?.totalQtyWithSpare ?? 0));
     const leadTimeWeeks = Math.max(0, toNumberOrZero(plan.leadTimeWeeks ?? bomItem?.leadTimeWeeks ?? bomItem?.leadTime ?? 0));
     const remarks = String(plan.remarks ?? bomItem?.remarks ?? '');
-    const fallbackAssetId = bomItem?.inventoryAssetId || '';
-    const fallbackSku = bomItem?.inventorySku || '';
-    const previousAssetIdOrSku = fallbackAssetId || fallbackSku;
-    const assetIdOrSku = selectedAsset?.assetId || selectedAsset?.sku || fallbackAssetId || fallbackSku;
+
+    const typeOfComponent = String(plan.typeOfComponent ?? bomItem?.typeOfComponent ?? '');
+    const srNo = Math.max(0, toNumberOrZero(plan.srNo ?? bomItem?.srNo ?? 0));
+    const supplierName = String(plan.supplierName ?? bomItem?.supplierName ?? '');
+    const nomenclatureDescription = String(plan.nomenclatureDescription ?? bomItem?.nomenclatureDescription ?? '');
+    const partNoDrg = String(plan.partNoDrg ?? bomItem?.partNoDrg ?? '');
+    const make = String(plan.make ?? bomItem?.make ?? '');
+    const qtyPerBoard = Math.max(0, toNumberOrZero(plan.qtyPerBoard ?? bomItem?.qtyPerBoard ?? 0));
+    const boardReq = Math.max(0, toNumberOrZero(plan.boardReq ?? bomItem?.boardReq ?? 0));
+    const spareQty = Math.max(0, toNumberOrZero(plan.spareQty ?? bomItem?.spareQty ?? 0));
+    const unitCost = Math.max(0, toNumberOrZero(plan.unitCost ?? bomItem?.unitCost ?? 0));
+    const additionalCost = Math.max(0, toNumberOrZero(plan.additionalCost ?? bomItem?.additionalCost ?? 0));
+    const moq = Math.max(0, toNumberOrZero(plan.moq ?? bomItem?.moq ?? 0));
+
+    const previousAssetIdOrSku = String(bomItem?.inventoryAssetId || bomItem?.inventorySku || '');
+    const fallbackAssetId = String(plan.inventoryAssetId ?? bomItem?.inventoryAssetId ?? '');
+    const fallbackSku = String(plan.inventorySku ?? bomItem?.inventorySku ?? '');
+    const fallbackItemName = String(plan.inventoryItemName ?? bomItem?.inventoryItemName ?? '');
+
     const inventoryAssetId = String(selectedAsset?.assetId || fallbackAssetId || '');
     const inventorySku = String(selectedAsset?.sku || fallbackSku || '');
-    const inventoryItemName = String(selectedAsset?.itemName || bomItem?.inventoryItemName || '');
+    const inventoryItemName = String(selectedAsset?.itemName || fallbackItemName || '');
+    const assetIdOrSku = String(inventoryAssetId || inventorySku || '');
 
-    if (!assetIdOrSku) {
-      setError('Please select an inventory item');
-      return;
-    }
-    if (!plannedQty || plannedQty <= 0) {
-      setError('Planned quantity must be greater than 0');
-      return;
-    }
     if (!bomItem?._id) {
       setError('BOM item id missing');
       return;
@@ -311,20 +346,41 @@ const SubmittedBom = () => {
     setError('');
     setSuccess('');
     try {
-      const bomUpdateRes = await api.put(`/projects/${projectId}/bom/${bomItem._id}`, {
+      const payload = {
         remarks,
         leadTimeWeeks,
         plannedQty,
         inventoryAssetId,
         inventorySku,
         inventoryItemName
-      });
+      };
+      if (isInventoryManager) {
+        Object.assign(payload, {
+          typeOfComponent,
+          srNo,
+          supplierName,
+          nomenclatureDescription,
+          partNoDrg,
+          make,
+          qtyPerBoard,
+          boardReq,
+          spareQty,
+          unitCost,
+          additionalCost,
+          moq
+        });
+      }
+
+      const bomUpdateRes = await api.put(`/projects/${projectId}/bom/${bomItem._id}`, payload);
       try {
-        await api.post(`/projects/${projectId}/materials/upsert`, { assetIdOrSku, plannedQuantity: plannedQty });
-        const sameAsPrev = previousAssetIdOrSku
-          && (previousAssetIdOrSku === selectedAsset?.assetId || previousAssetIdOrSku === selectedAsset?.sku || previousAssetIdOrSku === assetIdOrSku);
-        if (previousAssetIdOrSku && !sameAsPrev) {
-          await api.post(`/projects/${projectId}/materials/upsert`, { assetIdOrSku: previousAssetIdOrSku, plannedQuantity: 0 });
+        if (assetIdOrSku) {
+          await api.post(`/projects/${projectId}/materials/upsert`, { assetIdOrSku, plannedQuantity: plannedQty });
+          const sameAsPrev =
+            previousAssetIdOrSku
+            && (previousAssetIdOrSku === selectedAsset?.assetId || previousAssetIdOrSku === selectedAsset?.sku || previousAssetIdOrSku === assetIdOrSku);
+          if (previousAssetIdOrSku && !sameAsPrev) {
+            await api.post(`/projects/${projectId}/materials/upsert`, { assetIdOrSku: previousAssetIdOrSku, plannedQuantity: 0 });
+          }
         }
       } catch (err) {
         void err;
@@ -337,7 +393,23 @@ const SubmittedBom = () => {
         plannedQty,
         inventoryAssetId,
         inventorySku,
-        inventoryItemName
+        inventoryItemName,
+        ...(isInventoryManager
+          ? {
+            typeOfComponent,
+            srNo,
+            supplierName,
+            nomenclatureDescription,
+            partNoDrg,
+            make,
+            qtyPerBoard,
+            boardReq,
+            spareQty,
+            unitCost,
+            additionalCost,
+            moq
+          }
+          : {})
       };
       const nextBomItem = updatedBomItem || optimistic;
       setProjects((prev) =>
@@ -356,6 +428,22 @@ const SubmittedBom = () => {
         selectedAsset: null,
         query: '',
         lastSaved: {
+          ...(isInventoryManager
+            ? {
+              typeOfComponent,
+              srNo,
+              supplierName,
+              nomenclatureDescription,
+              partNoDrg,
+              make,
+              qtyPerBoard,
+              boardReq,
+              spareQty,
+              unitCost,
+              additionalCost,
+              moq
+            }
+            : {}),
           inventoryAssetId,
           inventorySku,
           inventoryItemName,
@@ -364,10 +452,10 @@ const SubmittedBom = () => {
           remarks
         }
       });
-      setSuccess('Saved planned inventory for BOM row');
+      setSuccess(isInventoryManager ? 'Saved BOM row' : 'Saved planned inventory for BOM row');
     } catch (err) {
       updateRowPlan(rowKey, { saving: false });
-      setError(err.response?.data?.message || 'Failed to save planned inventory');
+      setError(err.response?.data?.message || (isInventoryManager ? 'Failed to save BOM row' : 'Failed to save planned inventory'));
     }
   };
 
@@ -553,6 +641,26 @@ const SubmittedBom = () => {
                                     const saving = Boolean(plan.saving);
                                     const leadTimeWeeksValue = String(plan.leadTimeWeeks ?? b.leadTimeWeeks ?? plan.lastSaved?.leadTimeWeeks ?? toNumberOrZero(b.leadTime) ?? '');
                                     const remarksValue = String(plan.remarks ?? b.remarks ?? plan.lastSaved?.remarks ?? '');
+                                    const typeOfComponentValue = String(plan.typeOfComponent ?? b.typeOfComponent ?? '');
+                                    const srNoValue = String(plan.srNo ?? b.srNo ?? '');
+                                    const supplierValue = String(plan.supplierName ?? b.supplierName ?? '');
+                                    const descriptionValue = String(plan.nomenclatureDescription ?? b.nomenclatureDescription ?? '');
+                                    const partNoValue = String(plan.partNoDrg ?? b.partNoDrg ?? '');
+                                    const makeValue = String(plan.make ?? b.make ?? '');
+                                    const qtyPerBoardValue = String(plan.qtyPerBoard ?? b.qtyPerBoard ?? '');
+                                    const boardReqValue = String(plan.boardReq ?? b.boardReq ?? '');
+                                    const spareQtyValue = String(plan.spareQty ?? b.spareQty ?? '');
+                                    const unitCostValue = String(plan.unitCost ?? b.unitCost ?? '');
+                                    const additionalCostValue = String(plan.additionalCost ?? b.additionalCost ?? '');
+                                    const moqValue = String(plan.moq ?? b.moq ?? '');
+
+                                    const derived = computeDerived({
+                                      qtyPerBoard: plan.qtyPerBoard ?? b.qtyPerBoard,
+                                      boardReq: plan.boardReq ?? b.boardReq,
+                                      spareQty: plan.spareQty ?? b.spareQty,
+                                      unitCost: plan.unitCost ?? b.unitCost,
+                                      additionalCost: plan.additionalCost ?? b.additionalCost
+                                    });
                                     const effectiveInventoryLabel =
                                       b.inventoryItemName ||
                                       plan.lastSaved?.inventoryItemName ||
@@ -575,7 +683,7 @@ const SubmittedBom = () => {
                                       plan.lastSaved?.plannedQty ??
                                       '';
                                     const isSaved = Boolean(b.inventoryAssetId || b.inventorySku || plan.lastSaved?.inventoryAssetId || plan.lastSaved?.inventorySku) && effectivePlannedQty > 0;
-                                    const isEditing = Boolean(plan.isEditing) || !isSaved;
+                                    const isEditing = isInventoryManager ? Boolean(plan.isEditing) : (Boolean(plan.isEditing) || !isSaved);
 
                                     const utilizationAssetId = String(selectedAsset?.assetId || b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
                                     const utilizationSku = String(selectedAsset?.sku || b.inventorySku || plan.lastSaved?.inventorySku || '');
@@ -585,27 +693,152 @@ const SubmittedBom = () => {
                                     const meta = getUtilizationMeta({ hasLink, plannedQty: effectivePlannedQty, usedQty });
                                     return (
                                       <tr key={`${p._id}-${i}`} className="align-top">
-                                      <td className="px-2 py-2">{b.typeOfComponent}</td>
-                                      <td className="px-2 py-2">{b.srNo}</td>
-                                      <td className="px-2 py-2">{b.supplierName}</td>
+                                      <td className="px-2 py-2 min-w-[180px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={typeOfComponentValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { typeOfComponent: e.target.value })}
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.typeOfComponent
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={srNoValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { srNo: e.target.value })}
+                                            inputMode="numeric"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.srNo
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[200px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={supplierValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { supplierName: e.target.value })}
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.supplierName
+                                        )}
+                                      </td>
                                       <td className="px-2 py-2">
-                                        <div>{b.nomenclatureDescription}</div>
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={descriptionValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { nomenclatureDescription: e.target.value })}
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          <div>{b.nomenclatureDescription}</div>
+                                        )}
                                         <div className="mt-0.5 text-[10px] text-gray-500 font-bold">
                                           Inventory: {displayInventoryLabel} • Planned: {String(displayPlannedQty || '-') }
                                         </div>
                                       </td>
-                                      <td className="px-2 py-2">{b.partNoDrg}</td>
-                                      <td className="px-2 py-2">{b.make}</td>
-                                      <td className="px-2 py-2">{b.qtyPerBoard}</td>
-                                      <td className="px-2 py-2">{b.boardReq}</td>
-                                      <td className="px-2 py-2">{b.spareQty}</td>
-                                      <td className="px-2 py-2">{b.boardReqWithSpare}</td>
-                                      <td className="px-2 py-2">{b.totalQtyWithSpare}</td>
-                                      <td className="px-2 py-2">{b.unitCost}</td>
-                                      <td className="px-2 py-2">{b.additionalCost}</td>
-                                      <td className="px-2 py-2">{b.landingCostPerUnit}</td>
-                                      <td className="px-2 py-2">{b.totalPrice}</td>
-                                      <td className="px-2 py-2">{b.moq}</td>
+                                      <td className="px-2 py-2 min-w-[190px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={partNoValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { partNoDrg: e.target.value })}
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.partNoDrg
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[160px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={makeValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { make: e.target.value })}
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.make
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={qtyPerBoardValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { qtyPerBoard: e.target.value })}
+                                            inputMode="decimal"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.qtyPerBoard
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={boardReqValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { boardReq: e.target.value })}
+                                            inputMode="decimal"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.boardReq
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={spareQtyValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { spareQty: e.target.value })}
+                                            inputMode="decimal"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.spareQty
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2">{isEditing && isInventoryManager ? formatQty(derived.boardReqWithSpare) : b.boardReqWithSpare}</td>
+                                      <td className="px-2 py-2">{isEditing && isInventoryManager ? formatQty(derived.totalQtyWithSpare) : b.totalQtyWithSpare}</td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={unitCostValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { unitCost: e.target.value })}
+                                            inputMode="decimal"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.unitCost
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={additionalCostValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { additionalCost: e.target.value })}
+                                            inputMode="decimal"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.additionalCost
+                                        )}
+                                      </td>
+                                      <td className="px-2 py-2">{isEditing && isInventoryManager ? formatMoney(derived.landingCostPerUnit) : b.landingCostPerUnit}</td>
+                                      <td className="px-2 py-2">{isEditing && isInventoryManager ? formatMoney(derived.totalPrice) : b.totalPrice}</td>
+                                      <td className="px-2 py-2 min-w-[120px]">
+                                        {isEditing && isInventoryManager ? (
+                                          <input
+                                            value={moqValue}
+                                            onChange={(e) => updateRowPlan(rowKey, { moq: e.target.value })}
+                                            inputMode="decimal"
+                                            className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                          />
+                                        ) : (
+                                          b.moq
+                                        )}
+                                      </td>
                                       <td className="px-2 py-2 min-w-[140px]">
                                         {isEditing ? (
                                           <input
@@ -708,6 +941,25 @@ const SubmittedBom = () => {
                                             type="button"
                                             onClick={() => updateRowPlan(rowKey, {
                                               isEditing: true,
+                                              ...(isInventoryManager
+                                                ? {
+                                                  typeOfComponent: b.typeOfComponent ?? '',
+                                                  srNo: b.srNo ?? 0,
+                                                  supplierName: b.supplierName ?? '',
+                                                  nomenclatureDescription: b.nomenclatureDescription ?? '',
+                                                  partNoDrg: b.partNoDrg ?? '',
+                                                  make: b.make ?? '',
+                                                  qtyPerBoard: b.qtyPerBoard ?? 0,
+                                                  boardReq: b.boardReq ?? 0,
+                                                  spareQty: b.spareQty ?? 0,
+                                                  unitCost: b.unitCost ?? 0,
+                                                  additionalCost: b.additionalCost ?? 0,
+                                                  moq: b.moq ?? 0,
+                                                  inventoryAssetId: b.inventoryAssetId ?? '',
+                                                  inventorySku: b.inventorySku ?? '',
+                                                  inventoryItemName: b.inventoryItemName ?? ''
+                                                }
+                                                : {}),
                                               leadTimeWeeks: b.leadTimeWeeks ?? plan.lastSaved?.leadTimeWeeks ?? 0,
                                               remarks: b.remarks ?? plan.lastSaved?.remarks ?? '',
                                               plannedQty: b.plannedQty ?? plan.lastSaved?.plannedQty ?? b.totalQtyWithSpare ?? 0,

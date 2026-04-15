@@ -64,7 +64,6 @@ const UserManagement = () => {
 
   const rolePillClass = (role) => {
     if (role === ROLES.ADMIN) return 'bg-primary-50 text-primary-800';
-    if (role === ROLES.WAREHOUSE) return 'bg-accent-50 text-accent-800';
     if (role === ROLES.FINANCE) return 'bg-muted-50 text-muted-800';
     if (role === ROLES.PROJECT_MANAGER) return 'bg-primary-50 text-primary-800';
     return 'bg-muted-100 text-muted-800';

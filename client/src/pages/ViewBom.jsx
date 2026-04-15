@@ -12,6 +12,15 @@ const formatMoney = (value) => {
   return parsed.toFixed(2);
 };
 
+const isInventoryManagerEdited = (bomItem, field) => {
+  const list = bomItem?.inventoryManagerEditedFields;
+  return Array.isArray(list) && list.includes(field);
+};
+
+const cellClass = (bomItem, field) => (
+  `px-2 py-2 ${isInventoryManagerEdited(bomItem, field) ? 'bg-yellow-50' : ''}`
+);
+
 const ViewBom = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -106,7 +115,12 @@ const ViewBom = () => {
 
         {project && (project.bomItems?.length || 0) > 0 ? (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-            <div className="text-base font-extrabold text-gray-900">Saved BOM</div>
+            <div className="space-y-1">
+              <div className="text-base font-extrabold text-gray-900">Saved BOM</div>
+              <div className="text-xs text-gray-500 font-bold">
+                Note: highlighted cells were edited by Inventory Manager.
+              </div>
+            </div>
             <div className="overflow-auto border border-gray-200 rounded-xl">
               <table className="min-w-[2350px] w-full text-[11px]">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -142,29 +156,29 @@ const ViewBom = () => {
                     .sort((a, b) => Number(a.srNo || 0) - Number(b.srNo || 0))
                     .map((b) => (
                       <tr key={String(b._id || b.srNo)} className="align-top">
-                        <td className="px-2 py-2">{b.typeOfComponent || '-'}</td>
-                        <td className="px-2 py-2">{b.srNo}</td>
-                        <td className="px-2 py-2">{b.supplierName || '-'}</td>
-                        <td className="px-2 py-2">{b.nomenclatureDescription || '-'}</td>
-                        <td className="px-2 py-2">{b.partNoDrg || '-'}</td>
-                        <td className="px-2 py-2">{b.make || '-'}</td>
-                        <td className="px-2 py-2">{b.qtyPerBoard ?? 0}</td>
-                        <td className="px-2 py-2">{b.boardReq ?? 0}</td>
-                        <td className="px-2 py-2">{b.spareQty ?? 0}</td>
-                        <td className="px-2 py-2">{b.boardReqWithSpare ?? 0}</td>
-                        <td className="px-2 py-2">{b.totalQtyWithSpare ?? 0}</td>
-                        <td className="px-2 py-2">{formatMoney(b.unitCost)}</td>
-                        <td className="px-2 py-2">{formatMoney(b.additionalCost)}</td>
-                        <td className="px-2 py-2">{formatMoney(b.landingCostPerUnit)}</td>
-                        <td className="px-2 py-2">{formatMoney(b.totalPrice)}</td>
-                        <td className="px-2 py-2">{b.moq ?? 0}</td>
-                        <td className="px-2 py-2">{b.leadTime || '-'}</td>
-                        <td className="px-2 py-2">{b.leadTimeWeeks ?? 0}</td>
-                        <td className="px-2 py-2">{b.inventoryAssetId || '-'}</td>
-                        <td className="px-2 py-2">{b.inventorySku || '-'}</td>
-                        <td className="px-2 py-2">{b.inventoryItemName || '-'}</td>
-                        <td className="px-2 py-2">{b.plannedQty ?? 0}</td>
-                        <td className="px-2 py-2">{b.remarks || '-'}</td>
+                        <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent || '-'}</td>
+                        <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
+                        <td className={cellClass(b, 'supplierName')}>{b.supplierName || '-'}</td>
+                        <td className={cellClass(b, 'nomenclatureDescription')}>{b.nomenclatureDescription || '-'}</td>
+                        <td className={cellClass(b, 'partNoDrg')}>{b.partNoDrg || '-'}</td>
+                        <td className={cellClass(b, 'make')}>{b.make || '-'}</td>
+                        <td className={cellClass(b, 'qtyPerBoard')}>{b.qtyPerBoard ?? 0}</td>
+                        <td className={cellClass(b, 'boardReq')}>{b.boardReq ?? 0}</td>
+                        <td className={cellClass(b, 'spareQty')}>{b.spareQty ?? 0}</td>
+                        <td className={cellClass(b, 'boardReqWithSpare')}>{b.boardReqWithSpare ?? 0}</td>
+                        <td className={cellClass(b, 'totalQtyWithSpare')}>{b.totalQtyWithSpare ?? 0}</td>
+                        <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
+                        <td className={cellClass(b, 'additionalCost')}>{formatMoney(b.additionalCost)}</td>
+                        <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
+                        <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                        <td className={cellClass(b, 'moq')}>{b.moq ?? 0}</td>
+                        <td className={cellClass(b, 'leadTime')}>{b.leadTime || '-'}</td>
+                        <td className={cellClass(b, 'leadTimeWeeks')}>{b.leadTimeWeeks ?? 0}</td>
+                        <td className={cellClass(b, 'inventoryAssetId')}>{b.inventoryAssetId || '-'}</td>
+                        <td className={cellClass(b, 'inventorySku')}>{b.inventorySku || '-'}</td>
+                        <td className={cellClass(b, 'inventoryItemName')}>{b.inventoryItemName || '-'}</td>
+                        <td className={cellClass(b, 'plannedQty')}>{b.plannedQty ?? 0}</td>
+                        <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                       </tr>
                     ))}
                 </tbody>

@@ -31,6 +31,9 @@ router.post('/register', async (req, res) => {
     if (role === ROLES.ADMIN) {
       return res.status(403).json({ message: 'Cannot register as Admin' });
     }
+    if (role !== undefined && !Object.values(ROLES).includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
 
     const newUser = new User({ 
       username, 
@@ -72,6 +75,10 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+
+    if (!Object.values(ROLES).includes(user.role)) {
+      return res.status(403).json({ message: 'Access denied. Role is disabled.' });
+    }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
@@ -280,6 +287,9 @@ router.put('/users/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (r
 
     if (role === ROLES.ADMIN) {
       return res.status(403).json({ message: 'Cannot assign Admin role' });
+    }
+    if (role !== undefined && !Object.values(ROLES).includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
     }
 
     const user = await User.findById(id);

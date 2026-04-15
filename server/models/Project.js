@@ -45,7 +45,10 @@ const bomItemSchema = new mongoose.Schema({
   inventoryAssetId: { type: String, default: '', trim: true },
   inventorySku: { type: String, default: '', trim: true },
   inventoryItemName: { type: String, default: '', trim: true },
-  plannedQty: { type: Number, default: 0, min: 0 }
+  plannedQty: { type: Number, default: 0, min: 0 },
+  inventoryManagerEditedFields: { type: [String], default: [] },
+  inventoryManagerEditedAt: { type: Date, default: null },
+  inventoryManagerEditedBy: { type: String, default: '', trim: true }
 }, { timestamps: true });
 
 const bomChangeRequestSchema = new mongoose.Schema({

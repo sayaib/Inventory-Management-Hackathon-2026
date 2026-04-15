@@ -10,7 +10,7 @@ const { recordAuditLog } = require('../utils/recordAuditLog');
 
 const router = express.Router();
 
-const canViewProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.PRESALE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.WAREHOUSE]);
+const canViewProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.PRESALE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 const canCreateProjects = roleMiddleware([ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 const canEditProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 const canManageBom = roleMiddleware([ROLES.PRESALE, ROLES.ADMIN]);
@@ -40,7 +40,7 @@ const findAssetByIdOrSku = async (assetIdOrSku) => {
 
 const canAccessProject = (req, project) => {
   if (!req.user) return false;
-  if ([ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.WAREHOUSE, ROLES.PRESALE].includes(req.user.role)) return true;
+  if ([ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PRESALE].includes(req.user.role)) return true;
 
   if (req.user.role === ROLES.PROJECT_MANAGER) {
     const userDept = normalizeDepartmentForCompare(req.user.profileDepartment);
@@ -864,17 +864,79 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
     if (!bomItem) return res.status(404).json({ message: 'BOM item not found' });
 
     const rawPayload = req.body || {};
-    const payload = (() => {
-      if (req.user?.role !== ROLES.INVENTORY_MANAGER) return rawPayload;
-      const allowedKeys = new Set(['inventoryAssetId', 'inventorySku', 'inventoryItemName', 'plannedQty', 'leadTimeWeeks', 'remarks']);
-      const next = {};
-      for (const [k, v] of Object.entries(rawPayload)) {
-        if (allowedKeys.has(k)) next[k] = v;
-      }
-      return next;
-    })();
+    const allowedKeys = new Set([
+      'typeOfComponent',
+      'srNo',
+      'supplierName',
+      'nomenclatureDescription',
+      'partNoDrg',
+      'make',
+      'qtyPerBoard',
+      'boardReq',
+      'spareQty',
+      'unitCost',
+      'additionalCost',
+      'moq',
+      'remarks',
+      'leadTime',
+      'leadTimeWeeks',
+      'inventoryAssetId',
+      'inventorySku',
+      'inventoryItemName',
+      'plannedQty'
+    ]);
+    const payload = {};
+    for (const [k, v] of Object.entries(rawPayload)) {
+      if (allowedKeys.has(k)) payload[k] = v;
+    }
     const current = bomItem.toObject ? bomItem.toObject() : { ...bomItem };
+    const currentNormalized = buildBomItem(current);
     const normalized = buildBomItem({ ...current, ...payload });
+
+    const isInventoryManager = req.user?.role === ROLES.INVENTORY_MANAGER;
+    if (isInventoryManager) {
+      const trackedKeys = [
+        'typeOfComponent',
+        'srNo',
+        'supplierName',
+        'nomenclatureDescription',
+        'partNoDrg',
+        'make',
+        'qtyPerBoard',
+        'boardReq',
+        'spareQty',
+        'boardReqWithSpare',
+        'totalQtyWithSpare',
+        'unitCost',
+        'additionalCost',
+        'landingCostPerUnit',
+        'totalPrice',
+        'moq',
+        'remarks',
+        'leadTime',
+        'leadTimeWeeks',
+        'inventoryAssetId',
+        'inventorySku',
+        'inventoryItemName',
+        'plannedQty'
+      ];
+
+      const changedFields = [];
+      for (const key of trackedKeys) {
+        const before = currentNormalized?.[key];
+        const after = normalized?.[key];
+        const isNumber = typeof before === 'number' || typeof after === 'number';
+        const same = isNumber ? Number(before || 0) === Number(after || 0) : String(before || '') === String(after || '');
+        if (!same) changedFields.push(key);
+      }
+
+      if (changedFields.length > 0) {
+        const existing = Array.isArray(bomItem.inventoryManagerEditedFields) ? bomItem.inventoryManagerEditedFields : [];
+        bomItem.inventoryManagerEditedFields = Array.from(new Set([...existing.map((v) => String(v)), ...changedFields]));
+        bomItem.inventoryManagerEditedAt = new Date();
+        bomItem.inventoryManagerEditedBy = String(req.user?.email || req.user?.id || '');
+      }
+    }
 
     bomItem.typeOfComponent = normalized.typeOfComponent;
     bomItem.srNo = normalized.srNo;

@@ -215,8 +215,8 @@ router.get('/id/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Create new asset (Admin, Warehouse Staff, and Inventory Manager)
-router.post('/add', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
+// Create new asset (Admin and Inventory Manager)
+router.post('/add', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
   try {
     const assetData = req.body;
     
@@ -250,7 +250,7 @@ router.post('/add', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN
 });
 
 // Update stock by SKU (Convenience for QR/Barcode scanning)
-router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]), async (req, res) => {
+router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]), async (req, res) => {
   try {
     const { sku, quantityChange, type, projectId, reason, unitCost, notes, reference } = req.body;
     
@@ -463,7 +463,7 @@ router.post('/update-stock', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, RO
   }
 });
 
-router.post('/undo-utilization', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]), async (req, res) => {
+router.post('/undo-utilization', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]), async (req, res) => {
   try {
     const { projectId, assetIdOrSku, quantity } = req.body || {};
     if (!projectId) return res.status(400).json({ message: 'projectId is required' });
@@ -799,7 +799,7 @@ router.get('/finance/wastage-analytics', authMiddleware, roleMiddleware([ROLES.F
 });
 
 // Update stock/asset details
-router.put('/update/:id', authMiddleware, roleMiddleware([ROLES.WAREHOUSE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
+router.put('/update/:id', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
   try {
     const updateData = req.body;
     

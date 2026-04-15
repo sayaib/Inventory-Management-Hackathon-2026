@@ -19,6 +19,15 @@ const formatMoney = (value) => {
   return parsed.toFixed(2);
 };
 
+const isInventoryManagerEdited = (bomItem, field) => {
+  const list = bomItem?.inventoryManagerEditedFields;
+  return Array.isArray(list) && list.includes(field);
+};
+
+const cellClass = (bomItem, field) => (
+  `px-2 py-2 ${isInventoryManagerEdited(bomItem, field) ? 'bg-yellow-50' : ''}`
+);
+
 const Projects = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
@@ -141,7 +150,7 @@ const Projects = () => {
     return map;
   }, [summaryMaterials]);
 
-  const canUtilize = [ROLES.ADMIN, ROLES.WAREHOUSE, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER].includes(user?.role);
+  const canUtilize = [ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER].includes(user?.role);
 
   const buildRowKey = useCallback((material) => {
     const parts = [
@@ -418,39 +427,107 @@ const Projects = () => {
 
                 {showBom ? (
                   <div className="space-y-2">
-                    <div className="text-sm font-extrabold text-gray-900">BOM</div>
+                    <div className="space-y-1">
+                      <div className="text-sm font-extrabold text-gray-900">BOM</div>
+                      {isSalesHead ? (
+                        <div className="text-xs text-gray-500 font-bold">
+                          Note: highlighted cells were edited by Inventory Manager.
+                        </div>
+                      ) : null}
+                    </div>
                     {selectedProjectBom.length === 0 ? (
                       <div className="text-sm text-gray-500">No BOM items submitted yet.</div>
                     ) : (
                       <div className="overflow-auto border border-gray-200 rounded-xl">
-                        <table className="min-w-[1200px] w-full text-[11px]">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr className="text-[11px] font-black text-gray-700">
-                              <th className="px-2 py-2 text-left">Sr. No.</th>
-                              <th className="px-2 py-2 text-left">Type</th>
-                              <th className="px-2 py-2 text-left">Nomenclature / Description</th>
-                              <th className="px-2 py-2 text-left">Total Qty+Spare</th>
-                              <th className="px-2 py-2 text-left">Unit cost</th>
-                              <th className="px-2 py-2 text-left">Landing/unit</th>
-                              <th className="px-2 py-2 text-left">Total price</th>
-                              <th className="px-2 py-2 text-left">Remarks</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {selectedProjectBom.map((b) => (
-                              <tr key={String(b._id || b.srNo)} className="align-top">
-                                <td className="px-2 py-2">{b.srNo}</td>
-                                <td className="px-2 py-2">{b.typeOfComponent}</td>
-                                <td className="px-2 py-2">{b.nomenclatureDescription}</td>
-                                <td className="px-2 py-2">{b.totalQtyWithSpare}</td>
-                                <td className="px-2 py-2">{formatMoney(b.unitCost)}</td>
-                                <td className="px-2 py-2">{formatMoney(b.landingCostPerUnit)}</td>
-                                <td className="px-2 py-2">{formatMoney(b.totalPrice)}</td>
-                                <td className="px-2 py-2">{b.remarks || '-'}</td>
+                        {isSalesHead ? (
+                          <table className="min-w-[2350px] w-full text-[11px]">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr className="text-[11px] font-black text-gray-700">
+                                <th className="px-2 py-2 text-left">Type of Component</th>
+                                <th className="px-2 py-2 text-left">Sr. No.</th>
+                                <th className="px-2 py-2 text-left">Supplier Name</th>
+                                <th className="px-2 py-2 text-left">Nomenclature / Description</th>
+                                <th className="px-2 py-2 text-left">Part No. / Drg.</th>
+                                <th className="px-2 py-2 text-left">Make</th>
+                                <th className="px-2 py-2 text-left">Qty per Board</th>
+                                <th className="px-2 py-2 text-left">Board Req</th>
+                                <th className="px-2 py-2 text-left">Spare qty</th>
+                                <th className="px-2 py-2 text-left">Board Req with Spare</th>
+                                <th className="px-2 py-2 text-left">Total Qty with Spare</th>
+                                <th className="px-2 py-2 text-left">Unit cost</th>
+                                <th className="px-2 py-2 text-left">Additional cost</th>
+                                <th className="px-2 py-2 text-left">Landing/unit</th>
+                                <th className="px-2 py-2 text-left">Total price</th>
+                                <th className="px-2 py-2 text-left">MOQ</th>
+                                <th className="px-2 py-2 text-left">Lead time</th>
+                                <th className="px-2 py-2 text-left">Lead time (weeks)</th>
+                                <th className="px-2 py-2 text-left">Inventory Asset ID</th>
+                                <th className="px-2 py-2 text-left">Inventory SKU</th>
+                                <th className="px-2 py-2 text-left">Inventory Item Name</th>
+                                <th className="px-2 py-2 text-left">Planned Qty</th>
+                                <th className="px-2 py-2 text-left">Remarks</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {selectedProjectBom.map((b) => (
+                                <tr key={String(b._id || b.srNo)} className="align-top">
+                                  <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent || '-'}</td>
+                                  <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
+                                  <td className={cellClass(b, 'supplierName')}>{b.supplierName || '-'}</td>
+                                  <td className={cellClass(b, 'nomenclatureDescription')}>{b.nomenclatureDescription || '-'}</td>
+                                  <td className={cellClass(b, 'partNoDrg')}>{b.partNoDrg || '-'}</td>
+                                  <td className={cellClass(b, 'make')}>{b.make || '-'}</td>
+                                  <td className={cellClass(b, 'qtyPerBoard')}>{b.qtyPerBoard ?? 0}</td>
+                                  <td className={cellClass(b, 'boardReq')}>{b.boardReq ?? 0}</td>
+                                  <td className={cellClass(b, 'spareQty')}>{b.spareQty ?? 0}</td>
+                                  <td className={cellClass(b, 'boardReqWithSpare')}>{b.boardReqWithSpare ?? 0}</td>
+                                  <td className={cellClass(b, 'totalQtyWithSpare')}>{b.totalQtyWithSpare ?? 0}</td>
+                                  <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
+                                  <td className={cellClass(b, 'additionalCost')}>{formatMoney(b.additionalCost)}</td>
+                                  <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
+                                  <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                                  <td className={cellClass(b, 'moq')}>{b.moq ?? 0}</td>
+                                  <td className={cellClass(b, 'leadTime')}>{b.leadTime || '-'}</td>
+                                  <td className={cellClass(b, 'leadTimeWeeks')}>{b.leadTimeWeeks ?? 0}</td>
+                                  <td className={cellClass(b, 'inventoryAssetId')}>{b.inventoryAssetId || '-'}</td>
+                                  <td className={cellClass(b, 'inventorySku')}>{b.inventorySku || '-'}</td>
+                                  <td className={cellClass(b, 'inventoryItemName')}>{b.inventoryItemName || '-'}</td>
+                                  <td className={cellClass(b, 'plannedQty')}>{b.plannedQty ?? 0}</td>
+                                  <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <table className="min-w-[1200px] w-full text-[11px]">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr className="text-[11px] font-black text-gray-700">
+                                <th className="px-2 py-2 text-left">Sr. No.</th>
+                                <th className="px-2 py-2 text-left">Type</th>
+                                <th className="px-2 py-2 text-left">Nomenclature / Description</th>
+                                <th className="px-2 py-2 text-left">Total Qty+Spare</th>
+                                <th className="px-2 py-2 text-left">Unit cost</th>
+                                <th className="px-2 py-2 text-left">Landing/unit</th>
+                                <th className="px-2 py-2 text-left">Total price</th>
+                                <th className="px-2 py-2 text-left">Remarks</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {selectedProjectBom.map((b) => (
+                                <tr key={String(b._id || b.srNo)} className="align-top">
+                                  <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
+                                  <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent}</td>
+                                  <td className={cellClass(b, 'nomenclatureDescription')}>{b.nomenclatureDescription}</td>
+                                  <td className={cellClass(b, 'totalQtyWithSpare')}>{b.totalQtyWithSpare}</td>
+                                  <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
+                                  <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
+                                  <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                                  <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </div>
                     )}
                   </div>

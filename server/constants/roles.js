@@ -5,7 +5,6 @@ const ROLES = {
   PROJECT_MANAGER: 'project_manager',
   SALES_HEAD: 'sales_head',
   PRESALE: 'presale',
-  WAREHOUSE: 'warehouse',
   FINANCE: 'finance'
 };
 
@@ -42,11 +41,6 @@ const FEATURES = {
     'BOM dashboard',
     'View projects by department',
     'Prepare BOM requirements'
-  ],
-  [ROLES.WAREHOUSE]: [
-    'Scan items (QR/barcode)',
-    'Update stock (in/out)',
-    'Real-time sync'
   ],
   [ROLES.FINANCE]: [
     'Inventory valuation',

@@ -147,7 +147,7 @@ const Login = () => {
                   <div key={title} className="rounded-2xl border border-white/10 bg-white/7 p-3.5">
                     <div className="flex items-start gap-3">
                       <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tone}`}>
-                        <Icon className="h-4 w-4" />
+                        {React.createElement(Icon, { className: 'h-4 w-4' })}
                       </span>
                       <div>
                         <p className="text-sm font-semibold text-white">{title}</p>
