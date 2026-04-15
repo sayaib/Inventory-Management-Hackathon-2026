@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, PlusCircle, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Briefcase, ChevronDown, ChevronUp, ClipboardList, Eye, Pencil, PlusCircle, RefreshCw, Search, X } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -28,6 +28,15 @@ const cellClass = (bomItem, field) => (
   `px-2 py-2 ${isInventoryManagerEdited(bomItem, field) ? 'bg-yellow-50' : ''}`
 );
 
+const projectStatusPillClass = (status) => {
+  const next = String(status || '').trim().toLowerCase();
+  if (next.includes('complete') || next.includes('closed') || next.includes('done')) return 'bg-primary-100 text-primary-700';
+  if (next.includes('active') || next.includes('ongoing') || next.includes('in progress')) return 'bg-muted-100 text-muted-800';
+  if (next.includes('hold') || next.includes('pause') || next.includes('blocked')) return 'bg-accent-100 text-accent-700';
+  if (next.includes('pending') || next.includes('new') || next.includes('draft')) return 'bg-muted-50 text-muted-800';
+  return 'bg-gray-100 text-gray-700';
+};
+
 const Projects = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
@@ -39,8 +48,13 @@ const Projects = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [showBom, setShowBom] = useState(true);
-  const [showMaterials, setShowMaterials] = useState(true);
+  const [projectQuery, setProjectQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [collapsedDepts, setCollapsedDepts] = useState({});
+  const [activeTab, setActiveTab] = useState('materials');
+  const [bomQuery, setBomQuery] = useState('');
+  const [materialsQuery, setMaterialsQuery] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
 
   const [createForm, setCreateForm] = useState({ iwoNo: '', name: '', description: '', department: '' });
 
@@ -69,6 +83,7 @@ const Projects = () => {
   const fetchProjectSummary = useCallback(async () => {
     if (!selectedProjectId) return;
     setLoadingSummary(true);
+    setSummaryMaterials([]);
     try {
       const res = await api.get(`/projects/${selectedProjectId}/summary`);
       setSummaryMaterials(res.data?.materials || []);
@@ -84,10 +99,17 @@ const Projects = () => {
     fetchProjectSummary();
   }, [fetchProjectSummary, selectedProjectId]);
 
+  useEffect(() => {
+    setBomQuery('');
+    setMaterialsQuery('');
+    setActiveTab('materials');
+  }, [selectedProjectId]);
+
   const handleCreateProject = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setCreatingProject(true);
     try {
       const res = await api.post('/projects', createForm);
       const created = res.data.project;
@@ -97,11 +119,15 @@ const Projects = () => {
       setSuccess('Project created');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create project');
+    } finally {
+      setCreatingProject(false);
     }
   };
   const canCreateProject = [ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.SALES_HEAD].includes(user?.role);
   const isSalesHead = user?.role === ROLES.SALES_HEAD;
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
+  const canEditBom = user?.role === ROLES.PRESALE;
+  const canRaiseBomChangeRequest = [ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER].includes(user?.role);
   const userDept = normalizeDepartment(user?.profile?.department);
   const lockDepartment = isProjectManager && userDept !== 'Unassigned';
 
@@ -116,11 +142,33 @@ const Projects = () => {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [projects]);
 
+  const statuses = useMemo(() => {
+    const set = new Set();
+    for (const p of projects) {
+      const next = String(p?.status || '').trim();
+      if (next) set.add(next);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [projects]);
+
   const grouped = useMemo(() => {
     const map = new Map();
+    const q = projectQuery.trim().toLowerCase();
+    const statusQ = String(statusFilter || 'all').trim().toLowerCase();
     for (const p of projects) {
       const dept = normalizeDepartment(p.department);
       if (departmentFilter !== 'all' && dept !== departmentFilter) continue;
+      if (statusQ !== 'all' && String(p?.status || '').trim().toLowerCase() !== statusQ) continue;
+      if (q) {
+        const haystack = [
+          p?.name,
+          p?.code,
+          p?.description,
+          p?.department,
+          p?.status
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(q)) continue;
+      }
       const list = map.get(dept) || [];
       list.push(p);
       map.set(dept, list);
@@ -130,7 +178,7 @@ const Projects = () => {
       map.set(dept, list);
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [projects, departmentFilter]);
+  }, [projects, departmentFilter, projectQuery, statusFilter]);
 
   const selectedProject = useMemo(() => projects.find((p) => p._id === selectedProjectId) || null, [projects, selectedProjectId]);
 
@@ -151,6 +199,28 @@ const Projects = () => {
   }, [summaryMaterials]);
 
   const canUtilize = [ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER].includes(user?.role);
+
+  const overviewStats = useMemo(() => {
+    let planned = 0;
+    let allocated = 0;
+    let used = 0;
+
+    for (const m of selectedProjectMaterials) {
+      planned += Number(m?.plannedQuantity || 0);
+      allocated += Number(m?.allocatedQuantity || 0);
+      const summary = summaryByAssetId.get(m?.assetId);
+      used += Number(summary?.usedQuantity ?? 0);
+    }
+
+    const remaining = Math.max(0, planned - used);
+    return {
+      planned,
+      allocated,
+      used,
+      remaining,
+      allocatedLineItems: selectedProjectMaterials.filter((m) => Number(m?.allocatedQuantity || 0) > 0).length
+    };
+  }, [selectedProjectMaterials, summaryByAssetId]);
 
   const buildRowKey = useCallback((material) => {
     const parts = [
@@ -215,9 +285,43 @@ const Projects = () => {
     }
   }, [buildRowKey, fetchProjectSummary, fetchProjects, selectedProject, summaryByAssetId]);
 
+  const filteredBom = useMemo(() => {
+    const q = bomQuery.trim().toLowerCase();
+    if (!q) return selectedProjectBom;
+    return selectedProjectBom.filter((b) => {
+      const haystack = [
+        b?.srNo,
+        b?.typeOfComponent,
+        b?.supplierName,
+        b?.nomenclatureDescription,
+        b?.partNoDrg,
+        b?.make,
+        b?.inventoryAssetId,
+        b?.inventorySku,
+        b?.inventoryItemName,
+        b?.remarks
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [bomQuery, selectedProjectBom]);
+
+  const filteredMaterials = useMemo(() => {
+    const q = materialsQuery.trim().toLowerCase();
+    if (!q) return selectedProjectMaterials;
+    return selectedProjectMaterials.filter((m) => {
+      const haystack = [
+        m?.itemName,
+        m?.assetId,
+        m?.sku,
+        m?.unit
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [materialsQuery, selectedProjectMaterials]);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <nav className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -259,218 +363,421 @@ const Projects = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {canCreateProject && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-              <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                <PlusCircle className="h-4 w-4 text-primary" />
-                Create Project
-              </h2>
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4 lg:col-span-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                    <PlusCircle className="h-4 w-4 text-primary" />
+                    Create Project
+                  </h2>
+                  <div className="text-xs text-gray-500 mt-1">Create a new project (IWO-based) and start tracking BOM/materials.</div>
+                </div>
+              </div>
               <form className="space-y-3" onSubmit={handleCreateProject}>
-                <input
-                  value={createForm.iwoNo}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, iwoNo: e.target.value }))}
-                  placeholder="IWO No (e.g. IWO-001)"
-                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-                <input
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Name"
-                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
-                  required
-                />
-                <select
-                  value={createForm.department}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, department: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
-                  required={isSalesHead}
-                >
-                  <option value="" disabled>
-                    {isSalesHead ? 'Select Department (required)' : 'Select Department'}
-                  </option>
-                  <option value="IT">IT</option>
-                  <option value="IoT">IoT</option>
-                  <option value="PES">PES</option>
-                  <option value="ATE">ATE</option>
-                  <option value="DTMA">DTMA</option>
-                </select>
-                <textarea
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                  placeholder="Description"
-                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary min-h-[90px]"
-                />
+                <div className="space-y-1">
+                  <label htmlFor="create-iwo" className="text-xs font-extrabold text-gray-700">IWO No</label>
+                  <input
+                    id="create-iwo"
+                    value={createForm.iwoNo}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, iwoNo: e.target.value }))}
+                    placeholder="e.g. IWO-001"
+                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+                    required
+                    disabled={creatingProject}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="create-name" className="text-xs font-extrabold text-gray-700">Project name</label>
+                  <input
+                    id="create-name"
+                    value={createForm.name}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="e.g. Smart Meter Upgrade"
+                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+                    required
+                    disabled={creatingProject}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="create-dept" className="text-xs font-extrabold text-gray-700">
+                    Department{isSalesHead ? <span className="text-accent-700"> *</span> : null}
+                  </label>
+                  <select
+                    id="create-dept"
+                    value={createForm.department}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, department: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+                    required={isSalesHead}
+                    disabled={creatingProject}
+                  >
+                    <option value="" disabled>
+                      {isSalesHead ? 'Select department (required)' : 'Select department'}
+                    </option>
+                    <option value="IT">IT</option>
+                    <option value="IoT">IoT</option>
+                    <option value="PES">PES</option>
+                    <option value="ATE">ATE</option>
+                    <option value="DTMA">DTMA</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="create-desc" className="text-xs font-extrabold text-gray-700">Description</label>
+                  <textarea
+                    id="create-desc"
+                    value={createForm.description}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
+                    placeholder="Short description to help others understand scope"
+                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary min-h-[96px] font-medium text-gray-900"
+                    disabled={creatingProject}
+                  />
+                </div>
                 <button
                   type="submit"
-                  className="w-full px-4 py-2.5 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all"
+                  disabled={creatingProject}
+                  className="w-full px-4 py-2.5 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create
+                  {creatingProject ? 'Creating…' : 'Create'}
                 </button>
               </form>
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="text-base font-extrabold text-gray-900">Projects by Department</div>
-              <div className="flex items-center gap-2">
-                {lockDepartment ? (
-                  <div className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg font-extrabold text-gray-700">
-                    {userDept}
+          <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4 ${canCreateProject ? 'lg:col-span-4' : 'lg:col-span-4'}`}>
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-extrabold text-gray-900 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-primary" />
+                    Projects
                   </div>
-                ) : (
-                  <select
-                    value={departmentFilter}
-                    onChange={(e) => setDepartmentFilter(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
-                  >
-                    <option value="all">All Departments</option>
-                    {departments.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                )}
+                  <div className="text-xs text-gray-500 mt-1">Search and pick a project to view BOM and allocated materials.</div>
+                </div>
                 <button
                   type="button"
                   onClick={fetchProjects}
-                  className="px-3 py-2 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50"
                   disabled={loadingProjects}
                 >
+                  <RefreshCw className={`h-4 w-4 ${loadingProjects ? 'animate-spin' : ''}`} />
                   Refresh
                 </button>
               </div>
-            </div>
-            {loadingProjects ? (
-              <div className="text-sm text-gray-500">Loading…</div>
-            ) : grouped.length === 0 ? (
-              <div className="text-sm text-gray-500">No projects yet.</div>
-            ) : (
+
               <div className="space-y-2">
-                {grouped.map(([dept, list]) => (
-                  <div key={dept} className="border border-gray-200 rounded-2xl overflow-hidden">
-                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                      <div className="text-sm font-extrabold text-gray-900">{dept}</div>
-                      <div className="text-xs font-black text-gray-500">{list.length} projects</div>
+                <div className="relative">
+                  <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    value={projectQuery}
+                    onChange={(e) => setProjectQuery(e.target.value)}
+                    placeholder="Search by name, code, department…"
+                    className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-medium text-gray-900"
+                  />
+                  {projectQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setProjectQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  {lockDepartment ? (
+                    <div className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl font-extrabold text-gray-700">
+                      {userDept}
                     </div>
-                    <div className="divide-y divide-gray-100">
-                      {list.map((p) => {
-                        const isSelected = selectedProjectId === p._id;
-                        const bomCount = p.bomItems?.length || 0;
-                        const allocatedCount = (p.materials || []).filter((m) => Number(m.allocatedQuantity || 0) > 0).length;
-                        return (
-                          <button
-                            key={p._id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedProjectId(p._id);
-                              setShowBom(true);
-                              setShowMaterials(true);
-                            }}
-                            className={`w-full text-left px-4 py-3 transition-all ${isSelected ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'}`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="font-extrabold text-sm text-gray-900 truncate">{p.name}</div>
-                                <div className="text-[11px] text-gray-500 font-bold">{p.code}</div>
-                                <div className="text-[11px] text-gray-500 font-bold mt-0.5">
-                                  BOM: {bomCount} • Allocated: {allocatedCount}
-                                </div>
-                              </div>
-                              <div className="text-[10px] font-black uppercase tracking-wider text-gray-500">{p.status}</div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  ) : (
+                    <select
+                      value={departmentFilter}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                      className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+                    >
+                      <option value="all">All departments</option>
+                      {departments.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  )}
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-bold text-gray-900"
+                  >
+                    <option value="all">All statuses</option>
+                    {statuses.map((s) => (
+                      <option key={s} value={String(s).trim().toLowerCase()}>{s}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              {loadingProjects ? (
+                <div className="text-sm text-gray-500 py-6">Loading…</div>
+              ) : grouped.length === 0 ? (
+                <div className="py-8 text-center">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 border border-primary-100">
+                    <Briefcase className="h-6 w-6" />
+                  </div>
+                  <div className="mt-3 text-sm font-extrabold text-gray-900">No projects found</div>
+                  <div className="mt-1 text-xs text-gray-500">
+                    Try changing filters or create a new project.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {grouped.map(([dept, list]) => {
+                    const isCollapsed = Boolean(collapsedDepts[dept]);
+                    return (
+                      <div key={dept} className="border border-gray-200 rounded-2xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setCollapsedDepts((prev) => ({ ...prev, [dept]: !prev[dept] }))}
+                          className="w-full px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2 hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isCollapsed ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronUp className="h-4 w-4 text-gray-500" />}
+                            <div className="text-sm font-extrabold text-gray-900 truncate">{dept}</div>
+                          </div>
+                          <div className="text-xs font-black text-gray-500">{list.length} projects</div>
+                        </button>
+                        {isCollapsed ? null : (
+                          <div className="divide-y divide-gray-100">
+                            {list.map((p) => {
+                              const isSelected = selectedProjectId === p._id;
+                              const bomCount = p.bomItems?.length || 0;
+                              const allocatedCount = (p.materials || []).filter((m) => Number(m.allocatedQuantity || 0) > 0).length;
+                              return (
+                                <button
+                                  key={p._id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedProjectId(p._id);
+                                    setActiveTab('materials');
+                                  }}
+                                  className={`w-full text-left px-4 py-3 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                    isSelected ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'
+                                  }`}
+                                  aria-current={isSelected ? 'page' : undefined}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="font-extrabold text-sm text-gray-900 truncate">{p.name}</div>
+                                      <div className="text-[11px] text-gray-500 font-bold">{p.code}</div>
+                                      <div className="text-[11px] text-gray-500 font-bold mt-0.5">
+                                        BOM: {bomCount} • Allocated: {allocatedCount}
+                                      </div>
+                                      {p.description ? (
+                                        <div className="text-xs text-gray-600 mt-1 line-clamp-2">{p.description}</div>
+                                      ) : null}
+                                    </div>
+                                    <div className="shrink-0 flex flex-col items-end gap-2">
+                                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${projectStatusPillClass(p.status)}`}>
+                                        {p.status || 'Unknown'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-5 ${canCreateProject ? 'lg:col-span-5' : 'lg:col-span-8'}`}>
             {selectedProject ? (
               <>
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-base font-extrabold text-gray-900 truncate">{selectedProject.name}</div>
-                    <div className="text-xs text-gray-500 font-bold">
-                      {selectedProject.code} • {selectedProjectDept} • {selectedProject.status}
+                    <div className="flex items-start gap-2 min-w-0">
+                      <div className="min-w-0">
+                        <div className="text-base font-extrabold text-gray-900 truncate">{selectedProject.name}</div>
+                        <div className="text-xs text-gray-500 font-bold">
+                          {selectedProject.code} • {selectedProjectDept}
+                        </div>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${projectStatusPillClass(selectedProject.status)}`}>
+                        {selectedProject.status || 'Unknown'}
+                      </span>
                     </div>
                     {selectedProject.description ? (
                       <div className="text-sm text-gray-700 mt-2">{selectedProject.description}</div>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowBom((p) => !p)}
-                      className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
-                        showBom ? 'bg-primary text-white hover:bg-primary-700' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                      }`}
-                    >
-                      BOM ({selectedProjectBom.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowMaterials((p) => !p)}
-                      className={`px-3 py-2 rounded-lg font-bold text-sm transition-all ${
-                        showMaterials ? 'bg-primary text-white hover:bg-primary-700' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                      }`}
-                    >
-                      Allocated Materials ({selectedProjectMaterials.length})
-                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl border border-gray-200 bg-white">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">BOM Items</div>
+                    <div className="mt-1 text-lg font-extrabold text-gray-900">{selectedProjectBom.length}</div>
+                  </div>
+                  <div className="p-4 rounded-2xl border border-gray-200 bg-white">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">Allocated Items</div>
+                    <div className="mt-1 text-lg font-extrabold text-gray-900">{overviewStats.allocatedLineItems}</div>
+                  </div>
+                  <div className="p-4 rounded-2xl border border-gray-200 bg-white">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">Allocated Qty</div>
+                    <div className="mt-1 text-lg font-extrabold text-gray-900">{Math.round(overviewStats.allocated)}</div>
+                  </div>
+                  <div className="p-4 rounded-2xl border border-gray-200 bg-white">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-gray-500">Used Qty</div>
+                    <div className="mt-1 text-lg font-extrabold text-gray-900">{loadingSummary ? '…' : Math.round(overviewStats.used)}</div>
                   </div>
                 </div>
 
-                {showBom ? (
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <div className="text-sm font-extrabold text-gray-900">BOM</div>
-                      {isSalesHead ? (
-                        <div className="text-xs text-gray-500 font-bold">
-                          Note: highlighted cells were edited by Inventory Manager.
-                        </div>
-                      ) : null}
-                    </div>
-                    {selectedProjectBom.length === 0 ? (
-                      <div className="text-sm text-gray-500">No BOM items submitted yet.</div>
-                    ) : (
-                      <div className="overflow-auto border border-gray-200 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('materials')}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-extrabold text-sm transition-all ${
+                        activeTab === 'materials' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      }`}
+                    >
+                      Allocated Materials
+                      <span className={`inline-flex items-center justify-center h-5 px-2 rounded-full text-[11px] font-black ${
+                        activeTab === 'materials' ? 'bg-white/15 text-white' : 'bg-white text-gray-700'
+                      }`}>
+                        {selectedProjectMaterials.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('bom')}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-extrabold text-sm transition-all ${
+                        activeTab === 'bom' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      }`}
+                    >
+                      BOM
+                      <span className={`inline-flex items-center justify-center h-5 px-2 rounded-full text-[11px] font-black ${
+                        activeTab === 'bom' ? 'bg-white/15 text-white' : 'bg-white text-gray-700'
+                      }`}>
+                        {selectedProjectBom.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={(selectedProjectBom.length || 0) > 0 ? `/bom/${selectedProject._id}/view` : '#'}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-xs transition-all ${
+                        (selectedProjectBom.length || 0) > 0
+                          ? 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          : 'bg-gray-100 text-gray-400 pointer-events-none'
+                      }`}
+                      aria-disabled={(selectedProjectBom.length || 0) === 0}
+                    >
+                      <Eye className="h-4 w-4" />
+                      View BOM
+                    </Link>
+                    {canEditBom ? (
+                      <Link
+                        to={`/bom/${selectedProject._id}/add`}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-white font-bold text-xs hover:bg-primary-700 transition-all"
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                        Add BOM
+                      </Link>
+                    ) : null}
+                    {canEditBom && (selectedProjectBom.length || 0) > 0 ? (
+                      <Link
+                        to={`/bom/${selectedProject._id}/add?mode=edit`}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white text-primary-700 border border-primary-200 font-bold text-xs hover:bg-primary-50 transition-all"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit BOM
+                      </Link>
+                    ) : null}
+                    {canRaiseBomChangeRequest ? (
+                      <Link
+                        to="/projects/bom-change-request"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white text-gray-800 border border-gray-200 font-bold text-xs hover:bg-gray-50 transition-all"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        BOM Change Request
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+
+                {activeTab === 'bom' ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="text-sm font-extrabold text-gray-900">BOM</div>
                         {isSalesHead ? (
-                          <table className="min-w-[2350px] w-full text-[11px]">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                          <div className="text-xs text-gray-500 font-bold">Highlighted cells were edited by Inventory Manager.</div>
+                        ) : null}
+                      </div>
+                      <div className="relative sm:w-[320px]">
+                        <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          value={bomQuery}
+                          onChange={(e) => setBomQuery(e.target.value)}
+                          placeholder="Search BOM…"
+                          className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-medium text-gray-900"
+                        />
+                        {bomQuery ? (
+                          <button
+                            type="button"
+                            onClick={() => setBomQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
+                            aria-label="Clear BOM search"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {filteredBom.length === 0 ? (
+                      <div className="text-sm text-gray-500">No BOM items found.</div>
+                    ) : (
+                      <div className="overflow-auto border border-gray-200 rounded-2xl">
+                        {isSalesHead ? (
+                          <table className="min-w-[2350px] w-full text-xs">
+                            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                               <tr className="text-[11px] font-black text-gray-700">
-                                <th className="px-2 py-2 text-left">Type of Component</th>
-                                <th className="px-2 py-2 text-left">Sr. No.</th>
-                                <th className="px-2 py-2 text-left">Supplier Name</th>
-                                <th className="px-2 py-2 text-left">Nomenclature / Description</th>
-                                <th className="px-2 py-2 text-left">Part No. / Drg.</th>
-                                <th className="px-2 py-2 text-left">Make</th>
-                                <th className="px-2 py-2 text-left">Qty per Board</th>
-                                <th className="px-2 py-2 text-left">Board Req</th>
-                                <th className="px-2 py-2 text-left">Spare qty</th>
-                                <th className="px-2 py-2 text-left">Board Req with Spare</th>
-                                <th className="px-2 py-2 text-left">Total Qty with Spare</th>
-                                <th className="px-2 py-2 text-left">Unit cost</th>
-                                <th className="px-2 py-2 text-left">Additional cost</th>
-                                <th className="px-2 py-2 text-left">Landing/unit</th>
-                                <th className="px-2 py-2 text-left">Total price</th>
-                                <th className="px-2 py-2 text-left">MOQ</th>
-                                <th className="px-2 py-2 text-left">Lead time</th>
-                                <th className="px-2 py-2 text-left">Lead time (weeks)</th>
-                                <th className="px-2 py-2 text-left">Inventory Asset ID</th>
-                                <th className="px-2 py-2 text-left">Inventory SKU</th>
-                                <th className="px-2 py-2 text-left">Inventory Item Name</th>
-                                <th className="px-2 py-2 text-left">Planned Qty</th>
-                                <th className="px-2 py-2 text-left">Remarks</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Type of Component</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Sr. No.</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Supplier Name</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Nomenclature / Description</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Part No. / Drg.</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Make</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Qty per Board</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Board Req</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Spare qty</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Board Req with Spare</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Total Qty with Spare</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Unit cost</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Additional cost</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Landing/unit</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Total price</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">MOQ</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Lead time</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Lead time (weeks)</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Asset ID</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Inventory SKU</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Item Name</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Planned Qty</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Remarks</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {selectedProjectBom.map((b) => (
-                                <tr key={String(b._id || b.srNo)} className="align-top">
+                              {filteredBom.map((b) => (
+                                <tr key={String(b._id || b.srNo)} className="align-top hover:bg-gray-50">
                                   <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent || '-'}</td>
                                   <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
                                   <td className={cellClass(b, 'supplierName')}>{b.supplierName || '-'}</td>
@@ -499,22 +806,22 @@ const Projects = () => {
                             </tbody>
                           </table>
                         ) : (
-                          <table className="min-w-[1200px] w-full text-[11px]">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                          <table className="min-w-[1200px] w-full text-xs">
+                            <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                               <tr className="text-[11px] font-black text-gray-700">
-                                <th className="px-2 py-2 text-left">Sr. No.</th>
-                                <th className="px-2 py-2 text-left">Type</th>
-                                <th className="px-2 py-2 text-left">Nomenclature / Description</th>
-                                <th className="px-2 py-2 text-left">Total Qty+Spare</th>
-                                <th className="px-2 py-2 text-left">Unit cost</th>
-                                <th className="px-2 py-2 text-left">Landing/unit</th>
-                                <th className="px-2 py-2 text-left">Total price</th>
-                                <th className="px-2 py-2 text-left">Remarks</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Sr. No.</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Type</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Nomenclature / Description</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Total Qty+Spare</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Unit cost</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Landing/unit</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Total price</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Remarks</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {selectedProjectBom.map((b) => (
-                                <tr key={String(b._id || b.srNo)} className="align-top">
+                              {filteredBom.map((b) => (
+                                <tr key={String(b._id || b.srNo)} className="align-top hover:bg-gray-50">
                                   <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
                                   <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent}</td>
                                   <td className={cellClass(b, 'nomenclatureDescription')}>{b.nomenclatureDescription}</td>
@@ -531,32 +838,52 @@ const Projects = () => {
                       </div>
                     )}
                   </div>
-                ) : null}
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-sm font-extrabold text-gray-900">Allocated Materials (Inventory Manager)</div>
+                      <div className="relative sm:w-[320px]">
+                        <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          value={materialsQuery}
+                          onChange={(e) => setMaterialsQuery(e.target.value)}
+                          placeholder="Search materials…"
+                          className="w-full pl-9 pr-9 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-primary font-medium text-gray-900"
+                        />
+                        {materialsQuery ? (
+                          <button
+                            type="button"
+                            onClick={() => setMaterialsQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
+                            aria-label="Clear materials search"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
 
-                {showMaterials ? (
-                  <div className="space-y-2">
-                    <div className="text-sm font-extrabold text-gray-900">Allocated Materials (Inventory Manager)</div>
-                    {selectedProjectMaterials.length === 0 ? (
-                      <div className="text-sm text-gray-500">No planned/allocated materials yet.</div>
+                    {filteredMaterials.length === 0 ? (
+                      <div className="text-sm text-gray-500">No planned/allocated materials found.</div>
                     ) : (
-                      <div className="overflow-auto border border-gray-200 rounded-xl">
-                        <table className="min-w-[900px] w-full text-[11px]">
-                          <thead className="bg-gray-50 border-b border-gray-200">
+                      <div className="overflow-auto border border-gray-200 rounded-2xl">
+                        <table className="min-w-[980px] w-full text-xs">
+                          <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                             <tr className="text-[11px] font-black text-gray-700">
                               <th className="px-2 py-2 text-left">Item</th>
-                              <th className="px-2 py-2 text-left">Asset ID</th>
-                              <th className="px-2 py-2 text-left">SKU</th>
-                              <th className="px-2 py-2 text-left">Planned</th>
-                              <th className="px-2 py-2 text-left">Allocated</th>
-                              <th className="px-2 py-2 text-left">Used</th>
-                              <th className="px-2 py-2 text-left">Remaining</th>
-                              <th className="px-2 py-2 text-left">Status</th>
-                              <th className="px-2 py-2 text-left">Unit</th>
-                              {canUtilize ? <th className="px-2 py-2 text-left">Action</th> : null}
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Asset ID</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">SKU</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Planned</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Allocated</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Used</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Remaining</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Status</th>
+                              <th className="px-2 py-2 text-left whitespace-nowrap">Unit</th>
+                              {canUtilize ? <th className="px-2 py-2 text-left whitespace-nowrap">Action</th> : null}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {selectedProjectMaterials.map((m) => {
+                            {filteredMaterials.map((m) => {
                               const planned = Number(m.plannedQuantity || 0);
                               const allocated = Number(m.allocatedQuantity || 0);
                               const summary = summaryByAssetId.get(m.assetId);
@@ -600,7 +927,7 @@ const Projects = () => {
                                 };
                               })();
                               return (
-                                <tr key={`${m.assetId}-${m.sku}`} className={highlight ? 'bg-primary-50/40' : ''}>
+                                <tr key={`${m.assetId}-${m.sku}`} className={`${highlight ? 'bg-primary-50/40' : ''} hover:bg-gray-50`}>
                                   <td className="px-2 py-2">
                                     <div className="font-bold text-gray-900">{m.itemName}</div>
                                   </td>
@@ -608,8 +935,8 @@ const Projects = () => {
                                   <td className="px-2 py-2 font-bold text-gray-700">{m.sku}</td>
                                   <td className="px-2 py-2 font-bold text-gray-700">{planned}</td>
                                   <td className="px-2 py-2 font-extrabold text-gray-900">{allocated}</td>
-                                  <td className="px-2 py-2 font-bold text-gray-700">{used}</td>
-                                  <td className="px-2 py-2 font-bold text-gray-700">{remainingPlanned}</td>
+                                  <td className="px-2 py-2 font-bold text-gray-700">{loadingSummary ? '…' : used}</td>
+                                  <td className="px-2 py-2 font-bold text-gray-700">{loadingSummary ? '…' : remainingPlanned}</td>
                                   <td className="px-2 py-2">
                                     <span
                                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
@@ -646,7 +973,7 @@ const Projects = () => {
                       </div>
                     )}
                   </div>
-                ) : null}
+                )}
               </>
             ) : (
               <div className="text-sm text-gray-500">Select a project to view BOM and allocated materials.</div>
