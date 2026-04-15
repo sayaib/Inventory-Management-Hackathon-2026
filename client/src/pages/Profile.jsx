@@ -122,7 +122,7 @@ const Profile = () => {
                 Back
               </Link>
               <div className="hidden sm:flex items-center gap-2 text-gray-900">
-                <div className="p-2 bg-primary rounded-lg">
+                <Link to="/dashboard" aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
                   <img
                     src={APP_LOGO_URL}
                     alt="Optimized Solutions Ltd"
@@ -130,7 +130,7 @@ const Profile = () => {
                     loading="lazy"
                     decoding="async"
                   />
-                </div>
+                </Link>
                 <span className="text-lg font-bold tracking-tight">Profile</span>
               </div>
             </div>

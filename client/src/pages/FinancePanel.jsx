@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import { DEPARTMENTS } from '../constants/assets';
@@ -125,7 +126,7 @@ const FinancePanel = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-primary rounded-lg">
+              <Link to="/dashboard" aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
                 <img
                   src={APP_LOGO_URL}
                   alt="Optimized Solutions Ltd"
@@ -133,7 +134,7 @@ const FinancePanel = () => {
                   loading="lazy"
                   decoding="async"
                 />
-              </div>
+              </Link>
               <span className="text-xl font-bold text-gray-900 tracking-tight">Finance</span>
             </div>
             <div className="flex items-center space-x-6">

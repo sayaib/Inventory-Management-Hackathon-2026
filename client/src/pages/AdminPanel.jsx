@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download } from 'lucide-react';
 import UserManagement from '../components/UserManagement';
@@ -587,7 +588,11 @@ const AdminPanel = () => {
       <div className="flex min-h-screen w-full">
         <aside className="hidden w-60 shrink-0 border-r border-slate-800/40 bg-slate-950 text-slate-100 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
           <div className="flex items-center gap-3 px-4 py-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+            <Link
+              to="/dashboard"
+              aria-label="Go to dashboard home"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm"
+            >
               <img
                 src={APP_LOGO_URL}
                 alt="Optimized Solutions Ltd"
@@ -595,7 +600,7 @@ const AdminPanel = () => {
                 loading="lazy"
                 decoding="async"
               />
-            </div>
+            </Link>
             <div className="leading-tight">
               <div className="text-sm font-extrabold text-white">Admin Portal</div>
               <div className="text-xs text-slate-300">Inventory control</div>

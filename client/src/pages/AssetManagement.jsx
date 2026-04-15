@@ -5,6 +5,7 @@ import { ROLES } from '../constants/roles';
 import api from '../api/axios';
 import Barcode from 'react-barcode';
 import { 
+  ArrowLeft,
   Eye,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -29,6 +30,9 @@ import {
   Trash2
 } from 'lucide-react';
 import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_LOCATIONS, DEPARTMENTS, DEPT_FIELDS } from '../constants/assets';
+
+const APP_LOGO_URL =
+  'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
 
 const AssetManagement = () => {
   const { user } = useAuth();
@@ -353,8 +357,35 @@ const AssetManagement = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50/40 via-white to-muted-50/40 p-4 sm:p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-primary-50/40 via-white to-muted-50/40">
+      <nav className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard" aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
+                <img
+                  src={APP_LOGO_URL}
+                  alt="Optimized Solutions Ltd"
+                  className="h-6 w-6 rounded bg-white object-contain"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </Link>
+              <span className="text-xl font-bold text-gray-900 tracking-tight">Inventory</span>
+            </div>
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-2 text-gray-500 hover:text-primary transition-all duration-200 font-medium text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      <main className="p-4 sm:p-6">
+        <div className="max-w-6xl mx-auto">
         <div className="mb-6 rounded-3xl border border-primary-100 bg-white/70 backdrop-blur p-5 sm:p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
@@ -1512,6 +1543,7 @@ const AssetManagement = () => {
           </div>
         </div>
       )}
+      </main>
     </div>
   );
 };

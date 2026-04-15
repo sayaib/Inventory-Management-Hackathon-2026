@@ -53,7 +53,7 @@ const ViewBom = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-lg">
+              <Link to="/dashboard" aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
                 <img
                   src={APP_LOGO_URL}
                   alt="Optimized Solutions Ltd"
@@ -61,7 +61,7 @@ const ViewBom = () => {
                   loading="lazy"
                   decoding="async"
                 />
-              </div>
+              </Link>
               <span className="text-xl font-bold text-gray-900 tracking-tight">View BOM</span>
             </div>
             <div className="flex items-center gap-3">
