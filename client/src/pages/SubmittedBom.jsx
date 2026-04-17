@@ -97,6 +97,33 @@ const getUtilizationMeta = ({ hasLink, plannedQty, usedQty }) => {
   };
 };
 
+const getInventoryStatusMeta = (statusRaw) => {
+  const incoming = String(statusRaw || '').trim();
+  const status = incoming || 'Pending';
+  if (status === 'Assigned') {
+    return {
+      label: 'Assigned',
+      className: 'bg-primary-50 text-primary-700 border-primary-100'
+    };
+  }
+  if (status === 'Pending') {
+    return {
+      label: 'Pending',
+      className: 'bg-slate-50 text-slate-700 border-slate-200'
+    };
+  }
+  if (status === 'Need to Purchase') {
+    return {
+      label: 'Need to Purchase',
+      className: 'bg-accent-50 text-accent-700 border-accent-100'
+    };
+  }
+  return {
+    label: '—',
+    className: 'bg-gray-50 text-gray-700 border-gray-200'
+  };
+};
+
 const SubmittedBom = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
@@ -459,6 +486,40 @@ const SubmittedBom = () => {
     }
   };
 
+  const handleSetNeedToPurchase = async (projectId, rowIndex, bomItem) => {
+    const rowKey = getRowKey(projectId, bomItem?._id || rowIndex);
+    const isAssigned = Boolean(bomItem?.inventoryAssetId || bomItem?.inventorySku);
+    if (!bomItem?._id) {
+      setError('BOM item id missing');
+      return;
+    }
+    if (isAssigned) return;
+
+    updateRowPlan(rowKey, { statusSaving: true });
+    setError('');
+    setSuccess('');
+    try {
+      const res = await api.put(`/projects/${projectId}/bom/${bomItem._id}`, { inventoryStatus: 'Need to Purchase' });
+      const updatedBomItem = res.data?.bomItem;
+      if (updatedBomItem) {
+        setProjects((prev) =>
+          prev.map((p) => {
+            if (p._id !== projectId) return p;
+            return {
+              ...p,
+              bomItems: (p.bomItems || []).map((bi) => (String(bi._id) === String(updatedBomItem._id) ? updatedBomItem : bi))
+            };
+          })
+        );
+      }
+      updateRowPlan(rowKey, { statusSaving: false });
+      setSuccess('Inventory status set to Need to Purchase');
+    } catch (err) {
+      updateRowPlan(rowKey, { statusSaving: false });
+      setError(err.response?.data?.message || 'Failed to update inventory status');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200">
@@ -603,7 +664,7 @@ const SubmittedBom = () => {
 
                           {expandedProjects[p._id] && (p.bomItems?.length || 0) > 0 ? (
                             <div className="mt-3 overflow-auto border border-gray-200 rounded-xl">
-                              <table className="min-w-[1950px] w-full text-[11px]">
+                              <table className="min-w-[2150px] w-full text-[11px]">
                                 <thead className="bg-gray-50 border-b border-gray-200">
                                   <tr className="text-[11px] font-black text-gray-700">
                                     <th className="px-2 py-2 text-left">Type of Component</th>
@@ -626,6 +687,7 @@ const SubmittedBom = () => {
                                     <th className="px-2 py-2 text-left">Remarks</th>
                                     <th className="px-2 py-2 text-left">Inventory (search)</th>
                                     <th className="px-2 py-2 text-left">Planned qty</th>
+                                    <th className="px-2 py-2 text-left">Inventory status</th>
                                     <th className="px-2 py-2 text-left">Utilization</th>
                                     <th className="px-2 py-2 text-left">Save</th>
                                   </tr>
@@ -691,6 +753,14 @@ const SubmittedBom = () => {
                                     const match = (utilizationAssetId && byAssetId.get(utilizationAssetId)) || (utilizationSku && bySku.get(utilizationSku)) || null;
                                     const usedQty = toNumberOrZero(match?.usedQuantity ?? 0);
                                     const meta = getUtilizationMeta({ hasLink, plannedQty: effectivePlannedQty, usedQty });
+
+                                    const savedLinkAssetId = String(b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
+                                    const savedLinkSku = String(b.inventorySku || plan.lastSaved?.inventorySku || '');
+                                    const isAssigned = Boolean(savedLinkAssetId || savedLinkSku);
+                                    const statusLabel = isAssigned ? 'Assigned' : (b.inventoryStatus || '');
+                                    const statusMeta = getInventoryStatusMeta(statusLabel);
+                                    const statusSaving = Boolean(plan.statusSaving);
+
                                     return (
                                       <tr key={`${p._id}-${i}`} className="align-top">
                                       <td className="px-2 py-2 min-w-[180px]">
@@ -905,6 +975,21 @@ const SubmittedBom = () => {
                                         ) : (
                                           <div className="text-xs font-bold text-gray-800">{b.plannedQty ?? plan.lastSaved?.plannedQty ?? 0}</div>
                                         )}
+                                      </td>
+                                      <td className="px-2 py-2 min-w-[190px]">
+                                        <div className="space-y-2">
+                                          <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                                            {statusMeta.label}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSetNeedToPurchase(p._id, i, b)}
+                                            disabled={statusSaving || isAssigned || statusLabel === 'Need to Purchase'}
+                                            className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50"
+                                          >
+                                            {statusSaving ? 'Updating…' : 'Need to Purchase'}
+                                          </button>
+                                        </div>
                                       </td>
                                       <td className="px-2 py-2 min-w-[170px]">
                                         {summaryLoading ? (

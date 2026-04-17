@@ -21,6 +21,34 @@ const cellClass = (bomItem, field) => (
   `px-2 py-2 ${isInventoryManagerEdited(bomItem, field) ? 'bg-yellow-50' : ''}`
 );
 
+const getInventoryStatusMeta = (bomItem) => {
+  const hasLink = Boolean(bomItem?.inventoryAssetId || bomItem?.inventorySku);
+  const incoming = hasLink ? 'Assigned' : String(bomItem?.inventoryStatus || '').trim();
+  const status = incoming || 'Pending';
+  if (status === 'Assigned') {
+    return {
+      label: 'Assigned',
+      className: 'bg-primary-50 text-primary-700 border-primary-100'
+    };
+  }
+  if (status === 'Pending') {
+    return {
+      label: 'Pending',
+      className: 'bg-slate-50 text-slate-700 border-slate-200'
+    };
+  }
+  if (status === 'Need to Purchase') {
+    return {
+      label: 'Need to Purchase',
+      className: 'bg-accent-50 text-accent-700 border-accent-100'
+    };
+  }
+  return {
+    label: '—',
+    className: 'bg-gray-50 text-gray-700 border-gray-200'
+  };
+};
+
 const ViewBom = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -122,7 +150,7 @@ const ViewBom = () => {
               </div>
             </div>
             <div className="overflow-auto border border-gray-200 rounded-xl">
-              <table className="min-w-[2350px] w-full text-[11px]">
+              <table className="min-w-[2550px] w-full text-[11px]">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr className="text-[11px] font-black text-gray-700">
                     <th className="px-2 py-2 text-left">Type of Component</th>
@@ -147,6 +175,7 @@ const ViewBom = () => {
                     <th className="px-2 py-2 text-left">Inventory SKU</th>
                     <th className="px-2 py-2 text-left">Inventory Item Name</th>
                     <th className="px-2 py-2 text-left">Planned Qty</th>
+                    <th className="px-2 py-2 text-left">Inventory Status</th>
                     <th className="px-2 py-2 text-left">Remarks</th>
                   </tr>
                 </thead>
@@ -154,7 +183,9 @@ const ViewBom = () => {
                   {(project.bomItems || [])
                     .slice()
                     .sort((a, b) => Number(a.srNo || 0) - Number(b.srNo || 0))
-                    .map((b) => (
+                    .map((b) => {
+                      const statusMeta = getInventoryStatusMeta(b);
+                      return (
                       <tr key={String(b._id || b.srNo)} className="align-top">
                         <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent || '-'}</td>
                         <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
@@ -178,9 +209,15 @@ const ViewBom = () => {
                         <td className={cellClass(b, 'inventorySku')}>{b.inventorySku || '-'}</td>
                         <td className={cellClass(b, 'inventoryItemName')}>{b.inventoryItemName || '-'}</td>
                         <td className={cellClass(b, 'plannedQty')}>{b.plannedQty ?? 0}</td>
+                        <td className={cellClass(b, 'inventoryStatus')}>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                            {statusMeta.label}
+                          </span>
+                        </td>
                         <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                       </tr>
-                    ))}
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

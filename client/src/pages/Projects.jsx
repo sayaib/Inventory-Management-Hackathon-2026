@@ -28,6 +28,34 @@ const cellClass = (bomItem, field) => (
   `px-2 py-2 ${isInventoryManagerEdited(bomItem, field) ? 'bg-yellow-50' : ''}`
 );
 
+const getInventoryStatusMeta = (bomItem) => {
+  const hasLink = Boolean(bomItem?.inventoryAssetId || bomItem?.inventorySku);
+  const incoming = hasLink ? 'Assigned' : String(bomItem?.inventoryStatus || '').trim();
+  const status = incoming || 'Pending';
+  if (status === 'Assigned') {
+    return {
+      label: 'Assigned',
+      className: 'bg-primary-50 text-primary-700 border-primary-100'
+    };
+  }
+  if (status === 'Pending') {
+    return {
+      label: 'Pending',
+      className: 'bg-slate-50 text-slate-700 border-slate-200'
+    };
+  }
+  if (status === 'Need to Purchase') {
+    return {
+      label: 'Need to Purchase',
+      className: 'bg-accent-50 text-accent-700 border-accent-100'
+    };
+  }
+  return {
+    label: '—',
+    className: 'bg-gray-50 text-gray-700 border-gray-200'
+  };
+};
+
 const projectStatusPillClass = (status) => {
   const next = String(status || '').trim().toLowerCase();
   if (next.includes('complete') || next.includes('closed') || next.includes('done')) return 'bg-primary-100 text-primary-700';
@@ -746,8 +774,8 @@ const Projects = () => {
                       <div className="text-sm text-gray-500">No BOM items found.</div>
                     ) : (
                       <div className="overflow-auto border border-gray-200 rounded-2xl">
-                        {isSalesHead ? (
-                          <table className="min-w-[2350px] w-full text-xs">
+                        {isSalesHead || isProjectManager ? (
+                          <table className="min-w-[2550px] w-full text-xs">
                             <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                               <tr className="text-[11px] font-black text-gray-700">
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Type of Component</th>
@@ -772,11 +800,14 @@ const Projects = () => {
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Inventory SKU</th>
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Item Name</th>
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Planned Qty</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Status</th>
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Remarks</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {filteredBom.map((b) => (
+                              {filteredBom.map((b) => {
+                                const statusMeta = getInventoryStatusMeta(b);
+                                return (
                                 <tr key={String(b._id || b.srNo)} className="align-top hover:bg-gray-50">
                                   <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent || '-'}</td>
                                   <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
@@ -800,9 +831,15 @@ const Projects = () => {
                                   <td className={cellClass(b, 'inventorySku')}>{b.inventorySku || '-'}</td>
                                   <td className={cellClass(b, 'inventoryItemName')}>{b.inventoryItemName || '-'}</td>
                                   <td className={cellClass(b, 'plannedQty')}>{b.plannedQty ?? 0}</td>
+                                  <td className={cellClass(b, 'inventoryStatus')}>
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                                      {statusMeta.label}
+                                    </span>
+                                  </td>
                                   <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                                 </tr>
-                              ))}
+                                );
+                              })}
                             </tbody>
                           </table>
                         ) : (
@@ -816,11 +853,14 @@ const Projects = () => {
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Unit cost</th>
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Landing/unit</th>
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Total price</th>
+                                <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Status</th>
                                 <th className="px-2 py-2 text-left whitespace-nowrap">Remarks</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {filteredBom.map((b) => (
+                              {filteredBom.map((b) => {
+                                const statusMeta = getInventoryStatusMeta(b);
+                                return (
                                 <tr key={String(b._id || b.srNo)} className="align-top hover:bg-gray-50">
                                   <td className={cellClass(b, 'srNo')}>{b.srNo}</td>
                                   <td className={cellClass(b, 'typeOfComponent')}>{b.typeOfComponent}</td>
@@ -829,9 +869,15 @@ const Projects = () => {
                                   <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
                                   <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
                                   <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                                  <td className={cellClass(b, 'inventoryStatus')}>
+                                    <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                                      {statusMeta.label}
+                                    </span>
+                                  </td>
                                   <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                                 </tr>
-                              ))}
+                                );
+                              })}
                             </tbody>
                           </table>
                         )}

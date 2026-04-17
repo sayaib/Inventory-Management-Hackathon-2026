@@ -1136,7 +1136,7 @@ const AdminPanel = () => {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="min-w-0">
                       <h2 className="text-sm font-extrabold text-slate-900">Current project status</h2>
-                      <p className="text-xs text-slate-500">Inventory allocated, BOM created, and utilization with date & time.</p>
+                      <p className="text-xs text-slate-500">BOM created and utilization with date & time.</p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <input
@@ -1213,25 +1213,23 @@ const AdminPanel = () => {
                             <tr className="text-[11px] font-extrabold text-slate-700">
                               <th className="px-4 py-3">Project</th>
                               <th className="px-4 py-3">Department</th>
-                              <th className="px-4 py-3">Inventory allocated</th>
                               <th className="px-4 py-3">BOM created</th>
                               <th className="px-4 py-3">Utilization</th>
-                              <th className="px-4 py-3">Inventory used</th>
+                              <th className="px-4 py-3">BOM items</th>
                               <th className="px-4 py-3">Last activity</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {projectStatusLoading ? (
                               <tr>
-                                <td className="px-4 py-4 text-slate-500" colSpan={7}>Loading…</td>
+                                <td className="px-4 py-4 text-slate-500" colSpan={6}>Loading…</td>
                               </tr>
                             ) : rows.length === 0 ? (
                               <tr>
-                                <td className="px-4 py-4 text-slate-500" colSpan={7}>No projects found.</td>
+                                <td className="px-4 py-4 text-slate-500" colSpan={6}>No projects found.</td>
                               </tr>
                             ) : (
                               rows.map((p) => {
-                                const allocated = Boolean(p?.statuses?.inventoryAllocated?.value);
                                 const bom = Boolean(p?.statuses?.bomCreated?.value);
                                 const util = p?.statuses?.utilization || {};
                                 const utilBasis = util?.basis === 'allocated' ? 'Allocated' : util?.basis === 'planned' ? 'Planned' : '—';
@@ -1239,19 +1237,17 @@ const AdminPanel = () => {
                                 const utilUsed = Number(util?.usedTotal || 0);
                                 const utilPct = Number(util?.percent || 0);
                                 const projectId = String(p?.id || p?._id || p?.code || '');
-                                const items = Array.isArray(p?.inventoryItems) ? p.inventoryItems : [];
+                                const items = Array.isArray(p?.bomItems) ? p.bomItems : [];
                                 const isExpanded = Boolean(projectStatusExpanded?.[projectId]);
-                                const statusBadge = (status) => (
+                                const bomStatusBadge = (status) => (
                                   <span
                                     className={[
                                       'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider',
-                                      status === 'Utilized'
-                                        ? 'bg-emerald-100 text-emerald-700'
-                                        : status === 'Partially utilized'
-                                          ? 'bg-amber-100 text-amber-800'
-                                          : status === 'Allocated'
-                                            ? 'bg-sky-100 text-sky-800'
-                                            : 'bg-slate-100 text-slate-800'
+                                      status === 'Assigned'
+                                        ? 'bg-primary-50 text-primary-700'
+                                        : status === 'Need to Purchase'
+                                          ? 'bg-rose-100 text-rose-800'
+                                          : 'bg-slate-100 text-slate-800'
                                     ].join(' ')}
                                   >
                                     {status}
@@ -1267,12 +1263,6 @@ const AdminPanel = () => {
                                       <td className="px-4 py-3">
                                         <div className="text-[11px] font-extrabold text-slate-700">{p?.department || '-'}</div>
                                         <div className="text-[11px] font-semibold text-slate-500">{String(p?.status || '').replace('_', ' ')}</div>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                        <div className="flex flex-col gap-1">
-                                          {badge(allocated, allocated ? 'Allocated' : 'Not allocated')}
-                                          <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(p?.statuses?.inventoryAllocated?.at)}</div>
-                                        </div>
                                       </td>
                                       <td className="px-4 py-3">
                                         <div className="flex flex-col gap-1">
@@ -1315,47 +1305,47 @@ const AdminPanel = () => {
                                     </tr>
                                     {isExpanded ? (
                                       <tr className="bg-slate-50/60">
-                                        <td className="px-4 py-4" colSpan={7}>
+                                        <td className="px-4 py-4" colSpan={6}>
                                           {items.length === 0 ? (
                                             <div className="text-[11px] font-semibold text-slate-600">
-                                              No inventory planned/allocated/used for this project.
+                                              No BOM items for this project.
                                             </div>
                                           ) : (
                                             <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
                                               <table className="min-w-[1100px] w-full text-left text-xs">
                                                 <thead className="bg-slate-50 border-b border-slate-200">
                                                   <tr className="text-[11px] font-extrabold text-slate-700">
-                                                    <th className="px-3 py-2">Item</th>
-                                                    <th className="px-3 py-2">Asset ID</th>
-                                                    <th className="px-3 py-2">SKU</th>
-                                                    <th className="px-3 py-2">Planned</th>
-                                                    <th className="px-3 py-2">Allocated</th>
-                                                    <th className="px-3 py-2">Used</th>
-                                                    <th className="px-3 py-2">Remaining</th>
+                                                    <th className="px-3 py-2">Sr No</th>
+                                                    <th className="px-3 py-2">Type</th>
+                                                    <th className="px-3 py-2">Nomenclature</th>
+                                                    <th className="px-3 py-2">Part No / Drg</th>
+                                                    <th className="px-3 py-2">Make</th>
+                                                    <th className="px-3 py-2">Planned Qty</th>
                                                     <th className="px-3 py-2">Status</th>
-                                                    <th className="px-3 py-2">Unit</th>
+                                                    <th className="px-3 py-2">Inventory Ref</th>
                                                   </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                   {items
                                                     .slice()
-                                                    .sort((a, b) => Number(b?.usedQuantity || 0) - Number(a?.usedQuantity || 0))
+                                                    .sort((a, b) => Number(a?.srNo || 0) - Number(b?.srNo || 0))
                                                     .map((it) => (
-                                                      <tr key={`${projectId}-${it?.assetId || it?.sku || it?.itemName}`}>
+                                                      <tr key={`${projectId}-${String(it?.id || it?._id || it?.srNo || it?.partNoDrg || it?.nomenclatureDescription || '')}`}>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.srNo || 0)}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.typeOfComponent || '-'}</td>
                                                         <td className="px-3 py-2">
-                                                          <div className="font-bold text-slate-900">{it?.itemName || '-'}</div>
-                                                          <div className="text-[11px] font-semibold text-slate-500">
-                                                            {it?.basisType === 'allocated' ? 'Basis: Allocated' : it?.basisType === 'planned' ? 'Basis: Planned' : 'Basis: —'}
-                                                          </div>
+                                                          <div className="font-bold text-slate-900">{it?.nomenclatureDescription || '-'}</div>
                                                         </td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.assetId || '-'}</td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.sku || '-'}</td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.plannedQuantity || 0)}</td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.allocatedQuantity || 0)}</td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.usedQuantity || 0)}</td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.remainingQuantity || 0)}</td>
-                                                        <td className="px-3 py-2">{statusBadge(it?.status || 'Planned')}</td>
-                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.unit || 'pcs'}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.partNoDrg || '-'}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{it?.make || '-'}</td>
+                                                        <td className="px-3 py-2 text-[11px] font-semibold text-slate-700">{Number(it?.plannedQty || 0)}</td>
+                                                        <td className="px-3 py-2">{bomStatusBadge(it?.currentStatus || it?.inventoryStatus || 'Pending')}</td>
+                                                        <td className="px-3 py-2">
+                                                          <div className="text-[11px] font-semibold text-slate-700">
+                                                            {it?.inventoryAssetId || it?.inventorySku || '-'}
+                                                          </div>
+                                                          <div className="text-[11px] font-semibold text-slate-500">{it?.inventoryItemName || ''}</div>
+                                                        </td>
                                                       </tr>
                                                     ))}
                                                 </tbody>

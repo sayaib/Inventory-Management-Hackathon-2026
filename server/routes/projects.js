@@ -315,6 +315,26 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
         status: project.status,
         updatedAt: toIsoOrNull(project.updatedAt),
         inventoryItems,
+        bomItems: bomItems.map((it) => {
+          const hasLink = Boolean(String(it?.inventoryAssetId || '').trim() || String(it?.inventorySku || '').trim());
+          const incoming = String(it?.inventoryStatus || '').trim();
+          const currentStatus = hasLink ? 'Assigned' : (incoming || 'Pending');
+          return {
+            id: it?._id,
+            srNo: Math.max(0, Number(it?.srNo || 0)),
+            typeOfComponent: it?.typeOfComponent || '',
+            nomenclatureDescription: it?.nomenclatureDescription || '',
+            partNoDrg: it?.partNoDrg || '',
+            make: it?.make || '',
+            plannedQty: Math.max(0, Number(it?.plannedQty || 0)),
+            inventoryAssetId: it?.inventoryAssetId || '',
+            inventorySku: it?.inventorySku || '',
+            inventoryItemName: it?.inventoryItemName || '',
+            inventoryStatus: incoming || 'Pending',
+            currentStatus,
+            updatedAt: toIsoOrNull(it?.updatedAt || it?.createdAt)
+          };
+        }),
         statuses: {
           inventoryAllocated: { value: hasEverAllocated, at: inventoryAllocatedAt },
           materialsPlanned: { value: hasPlanning, at: materialsPlannedAt },
@@ -718,6 +738,17 @@ const buildBomItem = (payload) => {
   const leadTimeWeeks = Math.max(0, toNumberOrZero(payload.leadTimeWeeks ?? payload.leadTime));
   const plannedQty = Math.max(0, toNumberOrZero(payload.plannedQty));
 
+  const inventoryAssetId = typeof payload.inventoryAssetId === 'string' ? payload.inventoryAssetId.trim() : '';
+  const inventorySku = typeof payload.inventorySku === 'string' ? payload.inventorySku.trim() : '';
+  const inventoryItemName = typeof payload.inventoryItemName === 'string' ? payload.inventoryItemName.trim() : '';
+
+  const incomingStatusRaw = typeof payload.inventoryStatus === 'string' ? payload.inventoryStatus.trim() : '';
+  const incomingStatus =
+    incomingStatusRaw === 'Pending' || incomingStatusRaw === 'Need to Purchase' || incomingStatusRaw === 'Assigned'
+      ? incomingStatusRaw
+      : '';
+  const inventoryStatus = inventoryAssetId || inventorySku ? 'Assigned' : (incomingStatus === 'Need to Purchase' ? 'Need to Purchase' : 'Pending');
+
   return {
     typeOfComponent: typeof payload.typeOfComponent === 'string' ? payload.typeOfComponent.trim() : '',
     srNo: Math.max(0, toNumberOrZero(payload.srNo)),
@@ -738,10 +769,11 @@ const buildBomItem = (payload) => {
     remarks: typeof payload.remarks === 'string' ? payload.remarks.trim() : '',
     leadTime: typeof payload.leadTime === 'string' ? payload.leadTime.trim() : '',
     leadTimeWeeks,
-    inventoryAssetId: typeof payload.inventoryAssetId === 'string' ? payload.inventoryAssetId.trim() : '',
-    inventorySku: typeof payload.inventorySku === 'string' ? payload.inventorySku.trim() : '',
-    inventoryItemName: typeof payload.inventoryItemName === 'string' ? payload.inventoryItemName.trim() : '',
-    plannedQty
+    inventoryAssetId,
+    inventorySku,
+    inventoryItemName,
+    plannedQty,
+    inventoryStatus
   };
 };
 
@@ -883,7 +915,8 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
       'inventoryAssetId',
       'inventorySku',
       'inventoryItemName',
-      'plannedQty'
+      'plannedQty',
+      'inventoryStatus'
     ]);
     const payload = {};
     for (const [k, v] of Object.entries(rawPayload)) {
@@ -918,7 +951,8 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
         'inventoryAssetId',
         'inventorySku',
         'inventoryItemName',
-        'plannedQty'
+        'plannedQty',
+        'inventoryStatus'
       ];
 
       const changedFields = [];
@@ -961,6 +995,7 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
     bomItem.inventorySku = normalized.inventorySku;
     bomItem.inventoryItemName = normalized.inventoryItemName;
     bomItem.plannedQty = normalized.plannedQty;
+    bomItem.inventoryStatus = normalized.inventoryStatus;
 
     await project.save();
 
@@ -992,7 +1027,8 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
         plannedQty: bomItem.plannedQty,
         inventoryAssetId: bomItem.inventoryAssetId,
         inventorySku: bomItem.inventorySku,
-        inventoryItemName: bomItem.inventoryItemName
+        inventoryItemName: bomItem.inventoryItemName,
+        inventoryStatus: bomItem.inventoryStatus
       }
     });
 
