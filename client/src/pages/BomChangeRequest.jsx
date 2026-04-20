@@ -233,8 +233,8 @@ const BomChangeRequest = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+    <div className="min-h-screen app-bg">
+      <nav className="app-nav">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -277,14 +277,14 @@ const BomChangeRequest = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div className="lg:col-span-2 app-card p-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Project</div>
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                   disabled={loadingProjects}
                 >
                   <option value="" disabled>
@@ -303,7 +303,7 @@ const BomChangeRequest = () => {
                 <select
                   value={selectedBomItemId}
                   onChange={(e) => setSelectedBomItemId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                   disabled={!selectedProjectId || loadingProject}
                 >
                   <option value="">
@@ -327,7 +327,7 @@ const BomChangeRequest = () => {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g. Replace connector due to lead time"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                       required
                     />
                   </div>
@@ -337,7 +337,7 @@ const BomChangeRequest = () => {
                     <select
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -353,7 +353,7 @@ const BomChangeRequest = () => {
                       value={effectiveDate}
                       onChange={(e) => setEffectiveDate(e.target.value)}
                       type="date"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                     />
                   </div>
                   <div className="space-y-1">
@@ -362,7 +362,7 @@ const BomChangeRequest = () => {
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       placeholder="e.g. vendor EOL / cost reduction / availability"
-                      className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                       required
                     />
                   </div>
@@ -374,12 +374,12 @@ const BomChangeRequest = () => {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
                     placeholder="Any extra context for presales/procurement/approvers"
                   />
                 </div>
-
-                <div className="border border-gray-200 rounded-2xl p-4 space-y-3">
+Add category
+                <div className="border border-slate-200/70 rounded-2xl p-4 space-y-3 bg-white/40 backdrop-blur">
                   <div className="text-sm font-extrabold text-gray-900">Proposed Changes</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input
@@ -482,13 +482,13 @@ const BomChangeRequest = () => {
                 </button>
               </form>
             ) : (
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 font-bold">
+              <div className="rounded-2xl border border-slate-200/70 bg-white/60 px-4 py-3 text-sm text-gray-700 font-bold backdrop-blur">
                 You can view submitted change requests here. Submissions are allowed for Project Manager / Admin / Inventory Manager.
               </div>
             )}
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <div className="app-card p-6 space-y-4">
             <div className="text-sm font-extrabold text-gray-900">Current BOM Snapshot</div>
             {!selectedBomItem ? (
               <div className="text-sm text-gray-600">
@@ -540,13 +540,13 @@ const BomChangeRequest = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <div className="app-card p-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="text-base font-extrabold text-gray-900">Submitted Change Requests</div>
             <button
               type="button"
               onClick={fetchRequests}
-              className="px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-extrabold text-gray-700 hover:bg-gray-50 transition-all disabled:opacity-60"
+              className="px-3 py-2 rounded-xl border border-slate-200/70 bg-white/60 text-sm font-extrabold text-slate-700 hover:bg-white/80 transition-all disabled:opacity-60 backdrop-blur"
               disabled={!selectedProjectId || loadingRequests}
             >
               {loadingRequests ? 'Refreshing...' : 'Refresh'}
@@ -562,7 +562,7 @@ const BomChangeRequest = () => {
           ) : (
             <div className="space-y-3">
               {sortedRequests.map((r) => (
-                <div key={r?._id} className="rounded-2xl border border-gray-200 p-4 bg-white">
+                <div key={r?._id} className="rounded-2xl border border-slate-200/70 p-4 bg-white/60 backdrop-blur">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="text-sm font-extrabold text-gray-900 truncate">{r?.title || 'Untitled request'}</div>
@@ -571,7 +571,7 @@ const BomChangeRequest = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700 uppercase tracking-wider">
+                      <span className="inline-flex items-center rounded-full border border-slate-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-extrabold text-slate-700 uppercase tracking-wider backdrop-blur">
                         {String(r?.priority || 'medium')}
                       </span>
                       <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-[11px] font-extrabold text-primary-700 uppercase tracking-wider">
@@ -590,7 +590,7 @@ const BomChangeRequest = () => {
                   {r?.reason && <div className="mt-2 text-sm text-gray-700"><span className="font-extrabold">Reason:</span> {r.reason}</div>}
 
                   {r?.proposedChanges && Object.keys(r.proposedChanges || {}).length > 0 && (
-                    <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="mt-3 rounded-xl border border-slate-200/70 bg-white/60 p-3 backdrop-blur">
                       <div className="text-xs font-extrabold text-gray-700 uppercase tracking-wider">Proposed Changes</div>
                       <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                         {Object.entries(r.proposedChanges || {}).map(([k, v]) => (

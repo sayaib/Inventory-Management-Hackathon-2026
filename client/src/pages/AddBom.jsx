@@ -455,8 +455,8 @@ const AddBom = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+    <div className="min-h-screen app-bg">
+      <nav className="app-nav">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -546,7 +546,7 @@ const AddBom = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <div className="app-card p-5 space-y-4">
           {loading ? (
             <div className="text-sm text-gray-500 py-6">Loading…</div>
           ) : project ? (
@@ -560,7 +560,7 @@ const AddBom = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 font-bold text-sm hover:bg-gray-50 transition-all disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-slate-200/70 bg-white/60 text-slate-700 font-bold text-sm hover:bg-white/80 transition-all disabled:opacity-50 backdrop-blur"
                   disabled={saving || importing}
                 >
                   <Upload className="h-4 w-4" />
@@ -583,7 +583,7 @@ const AddBom = () => {
         </div>
 
         {showExistingBom && (project?.bomItems?.length || 0) > 0 ? (
-          <div ref={existingBomRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div ref={existingBomRef} className="app-card p-5 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-base font-extrabold text-gray-900">Current BOM</div>
@@ -661,7 +661,7 @@ const AddBom = () => {
         ) : null}
 
         {showEditExistingBom && (project?.bomItems?.length || 0) > 0 ? (
-          <div ref={editExistingRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div ref={editExistingRef} className="app-card p-5 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-base font-extrabold text-gray-900">Edit Submitted BOM</div>
@@ -887,7 +887,7 @@ const AddBom = () => {
         ) : null}
 
         {project ? (
-          <form ref={formRef} onSubmit={handleSave} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <form ref={formRef} onSubmit={handleSave} className="app-card p-5 space-y-4">
             <input
               ref={fileInputRef}
               type="file"

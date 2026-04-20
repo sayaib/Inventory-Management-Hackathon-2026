@@ -121,8 +121,8 @@ const FinancePanel = () => {
   }, [activeTab, fetchWastage]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+    <div className="min-h-screen app-bg">
+      <nav className="app-nav">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center space-x-3">
@@ -138,7 +138,7 @@ const FinancePanel = () => {
               <span className="text-xl font-bold text-gray-900 tracking-tight">Finance</span>
             </div>
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2 text-gray-700 bg-gray-100 px-3 py-1.5 rounded-full">
+              <div className="flex items-center space-x-2 text-gray-700 bg-white/60 border border-slate-200/60 px-3 py-1.5 rounded-full backdrop-blur">
                 <UserIcon className="h-4 w-4" />
                 <span className="text-sm font-medium">{user?.username}</span>
                 <span className="text-[10px] px-2 py-0.5 bg-primary-100 text-primary-800 rounded-full uppercase font-bold tracking-wider">
@@ -164,13 +164,11 @@ const FinancePanel = () => {
           <p className="mt-1 text-sm text-gray-600">Inventory valuation, cost tracking, and loss/wastage analytics.</p>
         </div>
 
-        <div className="flex space-x-2 p-1 bg-gray-200/60 w-fit rounded-xl">
+        <div className="app-tabbar">
           <button
             type="button"
             onClick={() => setActiveTab('valuation')}
-            className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'valuation' ? 'bg-white text-primary-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
-            }`}
+            className={`px-5 py-2 rounded-xl transition-all flex items-center space-x-1.5 ${activeTab === 'valuation' ? 'app-tab-active' : 'app-tab-idle'}`}
           >
             <Calculator className="h-4 w-4" />
             <span className="text-sm">Valuation</span>
@@ -178,9 +176,7 @@ const FinancePanel = () => {
           <button
             type="button"
             onClick={() => setActiveTab('cost')}
-            className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'cost' ? 'bg-white text-primary-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
-            }`}
+            className={`px-5 py-2 rounded-xl transition-all flex items-center space-x-1.5 ${activeTab === 'cost' ? 'app-tab-active' : 'app-tab-idle'}`}
           >
             <BarChart3 className="h-4 w-4" />
             <span className="text-sm">Cost Tracking</span>
@@ -188,9 +184,7 @@ const FinancePanel = () => {
           <button
             type="button"
             onClick={() => setActiveTab('wastage')}
-            className={`px-5 py-2 rounded-lg transition-all flex items-center space-x-1.5 ${
-              activeTab === 'wastage' ? 'bg-white text-primary-700 shadow-sm font-bold' : 'text-gray-500 font-medium hover:bg-gray-200'
-            }`}
+            className={`px-5 py-2 rounded-xl transition-all flex items-center space-x-1.5 ${activeTab === 'wastage' ? 'app-tab-active' : 'app-tab-idle'}`}
           >
             <TrendingDown className="h-4 w-4" />
             <span className="text-sm">Loss/Wastage</span>
@@ -198,8 +192,8 @@ const FinancePanel = () => {
         </div>
 
         {activeTab === 'valuation' && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-gray-200 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="mt-6 app-card overflow-hidden">
+            <div className="p-5 border-b border-slate-200/60 bg-white/40 backdrop-blur flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="text-xs font-black text-gray-500 uppercase tracking-widest">Total inventory value</div>
                 <div className="text-2xl font-extrabold text-gray-900">{formatCurrency(valuationTotalValue)}</div>
@@ -208,7 +202,7 @@ const FinancePanel = () => {
                 <select
                   value={valuationDepartment}
                   onChange={(e) => { setValuationDepartment(e.target.value); setValuationPage(1); }}
-                  className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                  className="px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   {departmentOptions.map((d) => (
                     <option key={d} value={d}>{d}</option>
@@ -220,7 +214,7 @@ const FinancePanel = () => {
                     value={valuationSearch}
                     onChange={(e) => { setValuationSearch(e.target.value); setValuationPage(1); }}
                     placeholder="Search SKU / Asset ID / Item"
-                    className="pl-9 pr-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary w-full md:w-80"
+                    className="pl-9 pr-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 w-full md:w-80"
                   />
                 </div>
                 <button
@@ -267,14 +261,14 @@ const FinancePanel = () => {
               </div>
             )}
 
-            <div className="p-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="p-4 border-t border-slate-200/60 bg-white/30 backdrop-blur flex items-center justify-between">
               <div className="text-xs font-semibold text-gray-500">Page {valuationPage} / {valuationTotalPages}</div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setValuationPage((p) => Math.max(1, p - 1))}
                   disabled={valuationPage <= 1}
-                  className="px-3 py-1.5 text-xs font-bold border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                  className="px-3 py-1.5 text-xs font-bold border border-slate-200/70 rounded-lg disabled:opacity-50 hover:bg-white/60"
                 >
                   Prev
                 </button>
@@ -282,7 +276,7 @@ const FinancePanel = () => {
                   type="button"
                   onClick={() => setValuationPage((p) => Math.min(valuationTotalPages, p + 1))}
                   disabled={valuationPage >= valuationTotalPages}
-                  className="px-3 py-1.5 text-xs font-bold border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+                  className="px-3 py-1.5 text-xs font-bold border border-slate-200/70 rounded-lg disabled:opacity-50 hover:bg-white/60"
                 >
                   Next
                 </button>
@@ -292,8 +286,8 @@ const FinancePanel = () => {
         )}
 
         {activeTab === 'cost' && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-gray-200">
+          <div className="mt-6 app-card overflow-hidden">
+            <div className="p-5 border-b border-slate-200/60 bg-white/40 backdrop-blur">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div className="flex-1">
                   <label className="block text-xs font-black text-gray-500 uppercase tracking-widest">Asset ID or SKU</label>
@@ -301,7 +295,7 @@ const FinancePanel = () => {
                     value={costAssetIdOrSku}
                     onChange={(e) => setCostAssetIdOrSku(e.target.value)}
                     placeholder="e.g. ASSET-XXXX or SKU-XXXX"
-                    className="mt-1 w-full px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                    className="mt-1 w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -311,7 +305,7 @@ const FinancePanel = () => {
                       type="date"
                       value={costFrom}
                       onChange={(e) => setCostFrom(e.target.value)}
-                      className="mt-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                      className="mt-1 px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
                   <div>
@@ -320,7 +314,7 @@ const FinancePanel = () => {
                       type="date"
                       value={costTo}
                       onChange={(e) => setCostTo(e.target.value)}
-                      className="mt-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                      className="mt-1 px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
                   <button
@@ -395,8 +389,8 @@ const FinancePanel = () => {
 
         {activeTab === 'wastage' && (
           <div className="mt-6 space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-gray-200 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div className="app-card overflow-hidden">
+              <div className="p-5 border-b border-slate-200/60 bg-white/40 backdrop-blur flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                 <div>
                   <div className="text-xs font-black text-gray-500 uppercase tracking-widest">Total Loss/Wastage</div>
                   <div className="text-2xl font-extrabold text-gray-900">{formatCurrency(wastageTotals.totalWastageValue)}</div>
@@ -406,7 +400,7 @@ const FinancePanel = () => {
                   <select
                     value={wastageDepartment}
                     onChange={(e) => setWastageDepartment(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                    className="px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                   >
                     {departmentOptions.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -416,13 +410,13 @@ const FinancePanel = () => {
                     type="date"
                     value={wastageFrom}
                     onChange={(e) => setWastageFrom(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                    className="px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                   />
                   <input
                     type="date"
                     value={wastageTo}
                     onChange={(e) => setWastageTo(e.target.value)}
-                    className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary"
+                    className="px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40"
                   />
                   <button
                     type="button"

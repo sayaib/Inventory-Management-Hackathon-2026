@@ -32,7 +32,7 @@ const Dashboard = () => {
 
   const roleUi = (() => {
     const base = {
-      pageBg: 'bg-gradient-to-b from-primary-50 via-white to-muted-50',
+      pageBg: 'app-bg',
       brandBg: 'bg-primary',
       badge: 'bg-primary-100 text-primary-800',
       linkHover: 'hover:text-primary-700',
@@ -49,7 +49,7 @@ const Dashboard = () => {
     if (isFinance) {
       return {
         ...base,
-        pageBg: 'bg-gradient-to-b from-muted-50 via-white to-primary-50',
+        pageBg: 'app-bg',
         brandBg: 'bg-muted',
         badge: 'bg-muted-100 text-muted-800',
         linkHover: 'hover:text-muted-800',
@@ -117,7 +117,7 @@ const Dashboard = () => {
 
   return (
     <div className={`min-h-screen ${roleUi.pageBg}`}>
-      <nav className="bg-white/80 backdrop-blur border-b border-gray-200">
+      <nav className="app-nav">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center space-x-3">

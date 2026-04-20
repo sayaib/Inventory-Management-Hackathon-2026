@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_LOCATIONS, DEPARTMENTS } = require('../constants/assets');
+const { ASSET_CATEGORIES, ASSET_STATUSES, DEPARTMENTS } = require('../constants/assets');
 
 const assetSchema = new mongoose.Schema({
   // Basic Fields
@@ -67,11 +67,14 @@ const assetSchema = new mongoose.Schema({
     default: 'active'
   },
 
-  // Location Fields
+  // Company & Location Fields
+  company: {
+    type: String,
+    trim: true
+  },
   location: {
     type: String,
-    enum: ASSET_LOCATIONS,
-    default: 'warehouse'
+    trim: true
   },
   assignedTo: {
     type: String, // Can be user name or employee ID

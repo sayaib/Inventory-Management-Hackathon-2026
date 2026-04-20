@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -29,7 +29,7 @@ import {
   Edit2,
   Trash2
 } from 'lucide-react';
-import { ASSET_CATEGORIES, ASSET_STATUSES, ASSET_LOCATIONS, DEPARTMENTS, DEPT_FIELDS } from '../constants/assets';
+import { ASSET_CATEGORIES, ASSET_STATUSES, DEPARTMENTS, DEPT_FIELDS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -48,6 +48,8 @@ const AssetManagement = () => {
   const queryParams = new URLSearchParams(location.search);
   const viewOnlyMode = queryParams.get('mode') === 'view';
   const initialLowStock = queryParams.get('lowStock') === 'true';
+  const fromAdmin = queryParams.get('from') === 'admin';
+  const backTo = fromAdmin ? '/admin' : '/dashboard';
 
   const canEdit = user?.role === ROLES.ADMIN || user?.role === ROLES.INVENTORY_MANAGER;
   const canDelete = user?.role === ROLES.ADMIN;
@@ -75,6 +77,8 @@ const AssetManagement = () => {
   const [assetToDelete, setAssetToDelete] = useState(null); // Asset to delete
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [companyDirectory, setCompanyDirectory] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState(ASSET_CATEGORIES);
   const itemsPerPage = 6;
 
   // Sync low stock filter with URL param changes
@@ -123,7 +127,8 @@ const AssetManagement = () => {
     lowStockThreshold: 5,
     unit: 'pcs',
     status: 'active',
-    location: 'office',
+    company: '',
+    location: '',
     assignedTo: '',
     purchaseCost: 0,
     vendorName: '',
@@ -171,12 +176,72 @@ const AssetManagement = () => {
     fetchAssets();
   }, [fetchAssets]);
 
+  const fetchCompanyDirectory = useCallback(async () => {
+    try {
+      const res = await api.get('/settings/company-directory');
+      const list = Array.isArray(res.data?.companyDirectory) ? res.data.companyDirectory : [];
+      const categories = Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0
+        ? res.data.assetCategories
+        : ASSET_CATEGORIES;
+      setCompanyDirectory(list);
+      setCategoryOptions(categories);
+      setFormData((prev) => {
+        if ((categories || []).includes(prev.category)) return prev;
+        return { ...prev, category: String(categories[0] || 'hardware') };
+      });
+    } catch (err) {
+      console.error('Failed to fetch company directory', err);
+      setCompanyDirectory([]);
+      setCategoryOptions(ASSET_CATEGORIES);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCompanyDirectory();
+  }, [fetchCompanyDirectory]);
+
+  const selectedCompanyLocations = useMemo(() => {
+    const company = String(formData.company || '').trim();
+    if (!company) return [];
+    const found = (companyDirectory || []).find(
+      (c) => String(c?.name || '').trim().toLowerCase() === company.toLowerCase()
+    );
+    return Array.isArray(found?.locations) ? found.locations : [];
+  }, [companyDirectory, formData.company]);
+
+  useEffect(() => {
+    if (!formData.company) return;
+    if (selectedCompanyLocations.length === 0) return;
+    if (selectedCompanyLocations.includes(formData.location)) return;
+    setFormData((prev) => ({
+      ...prev,
+      location: selectedCompanyLocations[0] || ''
+    }));
+  }, [formData.company, formData.location, selectedCompanyLocations]);
+
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    setFormData(prev => {
+      if (name !== 'company') {
+        return {
+          ...prev,
+          [name]: type === 'checkbox' ? checked : value
+        };
+      }
+
+      const nextCompany = value;
+      const found = (companyDirectory || []).find(
+        (c) => String(c?.name || '').trim().toLowerCase() === String(nextCompany || '').trim().toLowerCase()
+      );
+      const locations = Array.isArray(found?.locations) ? found.locations : [];
+      const nextLocation = locations.includes(prev.location) ? prev.location : (locations[0] || '');
+
+      return {
+        ...prev,
+        company: nextCompany,
+        location: nextLocation
+      };
+    });
   };
 
   const handleMetadataChange = (e) => {
@@ -213,7 +278,7 @@ const AssetManagement = () => {
       setFormData({
         itemName: '',
         sku: '',
-        category: 'hardware',
+        category: categoryOptions?.[0] || 'hardware',
         department: '',
         subDepartment: '',
         totalQuantity: 1,
@@ -221,7 +286,8 @@ const AssetManagement = () => {
         lowStockThreshold: 5,
         unit: 'pcs',
         status: 'active',
-        location: 'warehouse',
+        company: '',
+        location: '',
         assignedTo: '',
         purchaseCost: 0,
         vendorName: '',
@@ -244,7 +310,7 @@ const AssetManagement = () => {
     setFormData({
       itemName: asset.itemName || '',
       sku: asset.sku || '',
-      category: asset.category || 'hardware',
+      category: asset.category || categoryOptions?.[0] || 'hardware',
       department: asset.department || '',
       subDepartment: asset.subDepartment || '',
       totalQuantity: asset.totalQuantity || 1,
@@ -252,7 +318,8 @@ const AssetManagement = () => {
       lowStockThreshold: asset.lowStockThreshold || 5,
       unit: asset.unit || 'pcs',
       status: asset.status || 'active',
-      location: asset.location || 'warehouse',
+      company: asset.company || '',
+      location: asset.location || '',
       assignedTo: asset.assignedTo || '',
       purchaseCost: asset.purchaseCost || 0,
       vendorName: asset.vendorName || '',
@@ -362,7 +429,7 @@ const AssetManagement = () => {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
-              <Link to="/dashboard" aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
+              <Link to={backTo} aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
                 <img
                   src={APP_LOGO_URL}
                   alt="Optimized Solutions Ltd"
@@ -374,11 +441,11 @@ const AssetManagement = () => {
               <span className="text-xl font-bold text-gray-900 tracking-tight">Inventory</span>
             </div>
             <Link
-              to="/dashboard"
+              to={backTo}
               className="flex items-center gap-2 text-gray-500 hover:text-primary transition-all duration-200 font-medium text-sm"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back
+              {fromAdmin ? 'Back to Admin' : 'Back'}
             </Link>
           </div>
         </div>
@@ -520,7 +587,10 @@ const AssetManagement = () => {
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Category</label>
                       <select name="category" value={formData.category} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none">
-                        {ASSET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        {!(categoryOptions || []).includes(formData.category) && formData.category ? (
+                          <option value={formData.category}>{formData.category}</option>
+                        ) : null}
+                        {(categoryOptions || []).map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
@@ -531,7 +601,7 @@ const AssetManagement = () => {
                     </div>
                   </div>
 
-                  {/* Section 2: Quantities & Location */}
+                  {/* Section 2: Quantities, Company & Location */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="grid grid-cols-3 gap-3">
                       <div>
@@ -547,11 +617,43 @@ const AssetManagement = () => {
                         <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Company</label>
+                        <select
+                          name="company"
+                          value={formData.company}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+                        >
+                          <option value="">Select company</option>
+                          {!((companyDirectory || []).some((c) => String(c?.name || '') === String(formData.company || ''))) && formData.company ? (
+                            <option value={formData.company}>{formData.company}</option>
+                          ) : null}
+                          {(companyDirectory || []).map((c) => (
+                            <option key={c.id} value={c.name}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Location</label>
-                        <select name="location" value={formData.location} onChange={handleInputChange} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none">
-                          {ASSET_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                        <select
+                          name="location"
+                          value={formData.location}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+                        >
+                          <option value="">{selectedCompanyLocations.length ? 'Select location' : 'No locations available'}</option>
+                          {!(selectedCompanyLocations || []).includes(formData.location) && formData.location ? (
+                            <option value={formData.location}>{formData.location}</option>
+                          ) : null}
+                          {(selectedCompanyLocations || []).map((loc) => (
+                            <option key={loc} value={loc}>
+                              {loc}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
@@ -964,9 +1066,12 @@ const AssetManagement = () => {
                         <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
                           {asset.department}
                         </span>
+                        <span className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                          Company: {asset.company || 'N/A'}
+                        </span>
                         <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
                           <MapPin className="h-3.5 w-3.5 opacity-50" />
-                          {asset.location}
+                          {asset.location || 'N/A'}
                         </span>
                       </div>
 
@@ -1056,7 +1161,7 @@ const AssetManagement = () => {
                 <div className="hidden md:grid grid-cols-[1.6fr_1fr_1fr_.9fr_.9fr_1.2fr] gap-3 px-5 py-3 bg-gray-50 border-b border-gray-100 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">
                   <div>Item</div>
                   <div>Department</div>
-                  <div>Location</div>
+                  <div>Company / Location</div>
                   <div>Status</div>
                   <div className="text-right">Stock</div>
                   <div className="text-right">Actions</div>
@@ -1083,9 +1188,12 @@ const AssetManagement = () => {
                                 <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
                                   {asset.department}
                                 </span>
+                                <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
+                                  {asset.company || 'N/A'}
+                                </span>
                                 <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-extrabold text-gray-700">
                                   <MapPin className="h-3.5 w-3.5 opacity-50" />
-                                  {asset.location}
+                                  {asset.location || 'N/A'}
                                 </span>
                               </div>
                             </div>
@@ -1099,7 +1207,7 @@ const AssetManagement = () => {
 
                           <div className="hidden md:flex items-center gap-1 text-xs font-extrabold text-gray-700">
                             <MapPin className="h-4 w-4 opacity-40" />
-                            <span className="truncate">{asset.location}</span>
+                            <span className="truncate">{asset.company || 'N/A'} / {asset.location || 'N/A'}</span>
                           </div>
 
                           <div className="hidden md:block">
@@ -1380,8 +1488,12 @@ const AssetManagement = () => {
                       <span className="font-bold text-gray-900">{viewAsset.department}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500 flex items-center gap-2"><LayoutGrid className="h-4 w-4 opacity-40" /> Company</span>
+                      <span className="font-bold text-gray-900">{viewAsset.company || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500 flex items-center gap-2"><MapPin className="h-4 w-4 opacity-40" /> Location</span>
-                      <span className="font-bold text-gray-900">{viewAsset.location}</span>
+                      <span className="font-bold text-gray-900">{viewAsset.location || 'N/A'}</span>
                     </div>
                   </div>
                 </div>

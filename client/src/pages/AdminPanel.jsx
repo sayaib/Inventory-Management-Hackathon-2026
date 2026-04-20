@@ -2,11 +2,12 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import UserManagement from '../components/UserManagement';
 import AuditLog from '../components/AuditLog';
 import AdminProfile from '../components/AdminProfile';
 import api from '../api/axios';
-import { ASSET_LOCATIONS } from '../constants/assets';
+import { ASSET_CATEGORIES } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -68,14 +69,15 @@ const AdminPanel = () => {
   const [reportLogSearch, setReportLogSearch] = useState('');
   const [predictionProjects, setPredictionProjects] = useState([]);
   const [predictionLoading, setPredictionLoading] = useState(false);
+  const [predictionRunLoading, setPredictionRunLoading] = useState(false);
   const [predictionError, setPredictionError] = useState('');
   const [predictionProjectId, setPredictionProjectId] = useState('');
   const [predictionRows, setPredictionRows] = useState([]);
   const [predictionGeneratedAt, setPredictionGeneratedAt] = useState('');
+  const [predictionSummary, setPredictionSummary] = useState(null);
   const [predictionUploadMeta, setPredictionUploadMeta] = useState({ fileName: '', rows: 0 });
-  const [assetLocation, setAssetLocation] = useState(() => {
-    return localStorage.getItem('admin_asset_location') || localStorage.getItem('admin_company_location') || 'warehouse';
-  });
+  const [predictionHorizonDays, setPredictionHorizonDays] = useState(30);
+  const [predictionLookbackDays, setPredictionLookbackDays] = useState(90);
   const [companyDirectory, setCompanyDirectory] = useState(() => {
     try {
       const raw = localStorage.getItem('admin_company_directory_v1');
@@ -90,6 +92,10 @@ const AdminPanel = () => {
   const [selectedCompanyLocation, setSelectedCompanyLocation] = useState(() => localStorage.getItem('admin_selected_company_location') || '');
   const [newCompanyName, setNewCompanyName] = useState('');
   const [newLocationName, setNewLocationName] = useState('');
+  const [assetCategories, setAssetCategories] = useState(ASSET_CATEGORIES);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [selectedCategoryName, setSelectedCategoryName] = useState('');
+  const [renameCategoryName, setRenameCategoryName] = useState('');
   const [defaultLowStockThreshold, setDefaultLowStockThreshold] = useState(() => {
     const raw = localStorage.getItem('admin_default_low_stock_threshold');
     const n = Number(raw);
@@ -100,6 +106,32 @@ const AdminPanel = () => {
   const [companySettingsError, setCompanySettingsError] = useState('');
   const [bulkApplying, setBulkApplying] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ mode: '', done: 0, total: 0 });
+
+  const persistAssetCategories = useCallback(
+    async (nextCategories, successMessage) => {
+      setCompanySettingsError('');
+      setCompanySettingsSuccess('');
+      setCompanySettingsSaving(true);
+      try {
+        const res = await api.put('/settings/admin', { assetCategories: nextCategories });
+        const categories =
+          Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0 ? res.data.assetCategories : ASSET_CATEGORIES;
+        setAssetCategories(categories);
+        setSelectedCategoryName((prev) => (prev && categories.includes(prev) ? prev : String(categories[0] || '')));
+        setRenameCategoryName((prev) => {
+          const trimmed = String(prev || '').trim();
+          if (trimmed && categories.includes(trimmed)) return trimmed;
+          return String(categories[0] || '');
+        });
+        setCompanySettingsSuccess(successMessage);
+      } catch (err) {
+        setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to save categories');
+      } finally {
+        setCompanySettingsSaving(false);
+      }
+    },
+    [setAssetCategories]
+  );
 
   useEffect(() => {
     const company = (companyDirectory || []).find((c) => String(c?.id) === String(selectedCompanyId));
@@ -124,6 +156,98 @@ const AdminPanel = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('admin_selected_company_id', String(selectedCompanyId || ''));
+      localStorage.setItem('admin_selected_company_location', String(selectedCompanyLocation || ''));
+    } catch (e) {
+      void e;
+    }
+  }, [selectedCompanyId, selectedCompanyLocation]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.get('/settings/admin');
+        const dir = Array.isArray(res.data?.companyDirectory) ? res.data.companyDirectory : [];
+        const categories = Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0
+          ? res.data.assetCategories
+          : ASSET_CATEGORIES;
+        const n = Number(res.data?.defaultLowStockThreshold);
+        const selectedId = String(res.data?.selectedCompanyId || '');
+        const selectedLocation = String(res.data?.selectedCompanyLocation || '');
+        setCompanyDirectory(dir);
+        setAssetCategories(categories);
+        setSelectedCategoryName((prev) => (prev && categories.includes(prev) ? prev : String(categories[0] || '')));
+        setRenameCategoryName((prev) => (prev ? prev : String(categories[0] || '')));
+        setSelectedCompanyId(selectedId);
+        setSelectedCompanyLocation(selectedLocation);
+        setDefaultLowStockThreshold(Number.isFinite(n) && n >= 0 ? n : 5);
+      } catch (err) {
+        if (err?.response?.status !== 404) return;
+        try {
+          const fallbackDirectory = (() => {
+            try {
+              const raw = localStorage.getItem('admin_company_directory_v1');
+              if (!raw) return [];
+              const parsed = JSON.parse(raw);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })();
+          const fallbackThreshold = (() => {
+            try {
+              const raw = localStorage.getItem('admin_default_low_stock_threshold');
+              const n = Number(raw);
+              return Number.isFinite(n) && n >= 0 ? n : 5;
+            } catch {
+              return 5;
+            }
+          })();
+          const fallbackCategories = ASSET_CATEGORIES;
+          const fallbackSelectedCompanyId = (() => {
+            try {
+              return String(localStorage.getItem('admin_selected_company_id') || '');
+            } catch {
+              return '';
+            }
+          })();
+          const fallbackSelectedCompanyLocation = (() => {
+            try {
+              return String(localStorage.getItem('admin_selected_company_location') || '');
+            } catch {
+              return '';
+            }
+          })();
+          await api.put('/settings/admin', {
+            companyDirectory: fallbackDirectory,
+            assetCategories: fallbackCategories,
+            defaultLowStockThreshold: fallbackThreshold,
+            selectedCompanyId: fallbackSelectedCompanyId,
+            selectedCompanyLocation: fallbackSelectedCompanyLocation
+          });
+          setCompanyDirectory(fallbackDirectory);
+          setAssetCategories(fallbackCategories);
+          setSelectedCategoryName(String(fallbackCategories?.[0] || ''));
+          setRenameCategoryName(String(fallbackCategories?.[0] || ''));
+          setSelectedCompanyId(fallbackSelectedCompanyId);
+          setSelectedCompanyLocation(fallbackSelectedCompanyLocation);
+          setDefaultLowStockThreshold(fallbackThreshold);
+        } catch (e) {
+          void e;
+        }
+      }
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCategoryName && assetCategories.length > 0) {
+      setSelectedCategoryName(assetCategories[0]);
+    }
+  }, [assetCategories, selectedCategoryName]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -212,17 +336,6 @@ const AdminPanel = () => {
     URL.revokeObjectURL(url);
   };
 
-  const hashTo01 = (value) => {
-    const s = String(value || '');
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i += 1) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    const n = (h >>> 0) % 10000;
-    return n / 10000;
-  };
-
   const parseCsvText = (text) => {
     const raw = String(text || '')
       .replace(/\r\n/g, '\n')
@@ -276,65 +389,87 @@ const AdminPanel = () => {
     return rows;
   };
 
-  const buildPredictionsFromBomItems = (bomItems, sourceLabel) => {
-    const safe = Array.isArray(bomItems) ? bomItems : [];
-    const grouped = new Map();
+  const parseWorksheetRows = (sheet) => {
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+    const nonEmptyRows = matrix.filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
+    if (nonEmptyRows.length === 0) return [];
 
-    for (const it of safe) {
-      const name =
-        String(
-          it?.nomenclatureDescription ||
-            it?.itemName ||
-            it?.name ||
-            it?.partNoDrg ||
-            it?.sku ||
-            it?.typeOfComponent ||
-            ''
-        ).trim() || 'Unnamed item';
-
-      const totalQtyWithSpare = Number(it?.totalQtyWithSpare);
-      const qtyPerBoard = Number(it?.qtyPerBoard);
-      const boardReq = Number(it?.boardReq);
-      const spareQty = Number(it?.spareQty);
-      const qtyRaw = Number(it?.qty || it?.quantity || it?.totalQty || it?.totalQuantity);
-
-      const computedQty =
-        Number.isFinite(totalQtyWithSpare) && totalQtyWithSpare > 0
-          ? totalQtyWithSpare
-          : Number.isFinite(qtyRaw) && qtyRaw > 0
-            ? qtyRaw
-            : Number.isFinite(qtyPerBoard) && Number.isFinite(boardReq)
-              ? Math.max(0, qtyPerBoard) * Math.max(0, boardReq) + (Number.isFinite(spareQty) ? Math.max(0, spareQty) : 0)
-              : 1;
-
-      const prev = grouped.get(name) || 0;
-      grouped.set(name, prev + (Number.isFinite(computedQty) ? computedQty : 1));
-    }
-
-    const rows = Array.from(grouped.entries()).map(([itemName, requiredQty]) => {
-      const required = Math.max(0, Math.round((Number(requiredQty) + Number.EPSILON) * 100) / 100);
-      const r1 = hashTo01(`${sourceLabel || ''}:${itemName}:stock`);
-      const r2 = hashTo01(`${sourceLabel || ''}:${itemName}:demand`);
-      const currentStock = Math.max(0, Math.round(required * (0.25 + r1 * 1.05)));
-      const safetyStock = Math.max(0, Math.ceil(required * (0.2 + r2 * 0.15)));
-      const predictedDemand30d = Math.max(0, Math.round(required * (0.8 + r2 * 0.6)));
-      const recommendedPurchase = Math.max(0, Math.ceil(required + safetyStock - currentStock));
-      const status = currentStock >= required ? 'OK' : currentStock + recommendedPurchase >= required ? 'Reorder' : 'Critical';
-
-      return {
-        itemName,
-        required,
-        currentStock,
-        safetyStock,
-        predictedDemand30d,
-        recommendedPurchase,
-        status
-      };
+    const headerCells = (nonEmptyRows[0] || []).map((cell, idx) => {
+      const label = String(cell ?? '').trim();
+      return label || `Column ${idx + 1}`;
     });
 
-    rows.sort((a, b) => b.recommendedPurchase - a.recommendedPurchase);
-    setPredictionRows(rows);
-    setPredictionGeneratedAt(new Date().toISOString());
+    return nonEmptyRows.slice(1).map((cells) => {
+      const row = {};
+      for (let i = 0; i < headerCells.length; i += 1) {
+        row[headerCells[i]] = String(cells?.[i] ?? '').trim();
+      }
+      return row;
+    });
+  };
+
+  const parseBomUploadFile = async (file) => {
+    const name = String(file?.name || '').toLowerCase();
+    if (name.endsWith('.csv')) {
+      const text = await file.text();
+      return parseCsvText(text);
+    }
+
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const sheetName =
+      wb.SheetNames.find((s) => String(s || '').trim().toLowerCase() === 'bom') ||
+      wb.SheetNames[0] ||
+      '';
+    const sheet = sheetName ? wb.Sheets[sheetName] : null;
+    if (!sheet) return [];
+    return parseWorksheetRows(sheet);
+  };
+
+  const runPredictionFromProject = async (projectId) => {
+    const pid = String(projectId || '').trim();
+    if (!pid) return;
+    setPredictionRunLoading(true);
+    setPredictionError('');
+    try {
+      const res = await api.get('/predictions/bom', {
+        params: { projectId: pid, horizonDays: predictionHorizonDays, lookbackDays: predictionLookbackDays }
+      });
+      const rows = Array.isArray(res.data?.rows) ? res.data.rows : [];
+      const summary = res.data?.summary || null;
+      setPredictionRows(rows);
+      setPredictionSummary(summary);
+      setPredictionGeneratedAt(String(summary?.generatedAt || new Date().toISOString()));
+    } catch (err) {
+      setPredictionError(err.response?.data?.message || 'Failed to generate predictions from project BOM');
+    } finally {
+      setPredictionRunLoading(false);
+    }
+  };
+
+  const runPredictionFromUpload = async (file) => {
+    if (!file) return;
+    setPredictionRunLoading(true);
+    setPredictionError('');
+    try {
+      const rows = await parseBomUploadFile(file);
+      setPredictionUploadMeta({ fileName: file.name, rows: rows.length });
+      const res = await api.post('/predictions/bom/rows', {
+        rows,
+        fileName: file.name,
+        horizonDays: predictionHorizonDays,
+        lookbackDays: predictionLookbackDays
+      });
+      const outRows = Array.isArray(res.data?.rows) ? res.data.rows : [];
+      const summary = res.data?.summary || null;
+      setPredictionRows(outRows);
+      setPredictionSummary(summary);
+      setPredictionGeneratedAt(String(summary?.generatedAt || new Date().toISOString()));
+    } catch (err) {
+      setPredictionError(err.response?.data?.message || err?.message || 'Failed to parse/upload BOM');
+    } finally {
+      setPredictionRunLoading(false);
+    }
   };
 
   const fetchPredictionProjects = useCallback(async () => {
@@ -483,6 +618,7 @@ const AdminPanel = () => {
 
   const navItems = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { key: 'inventory', label: 'Inventory', icon: Package, href: '/inventory?from=admin' },
     { key: 'projectStatus', label: 'Project Status', icon: FolderKanban },
     { key: 'prediction', label: 'Prediction', icon: BarChart3 },
     { key: 'users', label: 'Users', icon: Users },
@@ -584,7 +720,7 @@ const AdminPanel = () => {
   })();
  
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-slate-50 to-slate-100">
+    <div className="min-h-screen app-bg">
       <div className="flex min-h-screen w-full">
         <aside className="hidden w-60 shrink-0 border-r border-slate-800/40 bg-slate-950 text-slate-100 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
           <div className="flex items-center gap-3 px-4 py-4">
@@ -613,6 +749,27 @@ const AdminPanel = () => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
                 const isDisabled = item.disabled === true;
+                const content = (
+                  <>
+                    <Icon className="h-4 w-4" />
+                    <span className="truncate">{item.label}</span>
+                    {isDisabled && <span className="ml-auto text-[10px] font-bold text-slate-300">Soon</span>}
+                  </>
+                );
+                if (item.href) {
+                  return (
+                    <Link
+                      key={item.key}
+                      to={item.href}
+                      className={[
+                        'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
+                        'text-slate-200 hover:bg-white/5 hover:text-white'
+                      ].join(' ')}
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
                 return (
                   <button
                     key={item.key}
@@ -626,9 +783,7 @@ const AdminPanel = () => {
                     ].join(' ')}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span className="truncate">{item.label}</span>
-                    {isDisabled && <span className="ml-auto text-[10px] font-bold text-slate-300">Soon</span>}
+                    {content}
                   </button>
                 );
               })}
@@ -657,7 +812,7 @@ const AdminPanel = () => {
         </aside>
 
         <main className="min-w-0 flex-1 lg:ml-60">
-          <header className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/85 backdrop-blur">
+          <header className="sticky top-0 z-10 app-nav">
             <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
               <div className="min-w-0">
                 <h1 className="truncate text-base font-extrabold text-slate-900">
@@ -700,6 +855,23 @@ const AdminPanel = () => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.key;
                     const isDisabled = item.disabled === true;
+                    const content = (
+                      <>
+                        <Icon className="h-3.5 w-3.5" />
+                        {item.label}
+                      </>
+                    );
+                    if (item.href) {
+                      return (
+                        <Link
+                          key={item.key}
+                          to={item.href}
+                          className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold transition"
+                        >
+                          {content}
+                        </Link>
+                      );
+                    }
                     return (
                       <button
                         key={item.key}
@@ -712,8 +884,7 @@ const AdminPanel = () => {
                           isDisabled ? 'cursor-not-allowed opacity-50' : ''
                         ].join(' ')}
                       >
-                        <Icon className="h-3.5 w-3.5" />
-                        {item.label}
+                        {content}
                       </button>
                     );
                   })}
@@ -1244,10 +1415,10 @@ const AdminPanel = () => {
                                     className={[
                                       'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider',
                                       status === 'Assigned'
-                                        ? 'bg-primary-50 text-primary-700'
+                                        ? 'bg-emerald-50 text-emerald-700'
                                         : status === 'Need to Purchase'
                                           ? 'bg-rose-100 text-rose-800'
-                                          : 'bg-slate-100 text-slate-800'
+                                          : 'bg-amber-50 text-amber-700'
                                     ].join(' ')}
                                   >
                                     {status}
@@ -1377,12 +1548,33 @@ const AdminPanel = () => {
                       <p className="text-xs text-slate-500">Upload a BOM or pick a project BOM to generate inventory predictions from live application data.</p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={predictionHorizonDays}
+                        onChange={(e) => setPredictionHorizonDays(Number(e.target.value || 0))}
+                        className="h-9 w-full sm:w-28 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        placeholder="Horizon"
+                        disabled={predictionRunLoading}
+                      />
+                      <input
+                        type="number"
+                        min={7}
+                        max={365}
+                        value={predictionLookbackDays}
+                        onChange={(e) => setPredictionLookbackDays(Number(e.target.value || 0))}
+                        className="h-9 w-full sm:w-28 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                        placeholder="Lookback"
+                        disabled={predictionRunLoading}
+                      />
                       <button
                         type="button"
                         onClick={async () => {
                           await fetchPredictionProjects();
                         }}
                         className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                        disabled={predictionLoading || predictionRunLoading}
                       >
                         Refresh BOMs
                       </button>
@@ -1406,16 +1598,19 @@ const AdminPanel = () => {
                             setPredictionProjectId(next);
                             const project = (predictionProjects || []).find((p) => String(p?._id) === String(next));
                             if (project) {
-                              buildPredictionsFromBomItems(project?.bomItems || [], `project:${project?._id || ''}`);
                               setPredictionUploadMeta({ fileName: `${project?.code || 'project'}_bom`, rows: (project?.bomItems || []).length });
+                              setPredictionRows([]);
+                              setPredictionSummary(null);
+                              setPredictionGeneratedAt('');
                             } else {
                               setPredictionRows([]);
+                              setPredictionSummary(null);
                               setPredictionGeneratedAt('');
                               setPredictionUploadMeta({ fileName: '', rows: 0 });
                             }
                           }}
                           className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
-                          disabled={predictionLoading}
+                          disabled={predictionLoading || predictionRunLoading}
                         >
                           {(predictionProjects || []).length === 0 ? (
                             <option value="">No projects with BOM</option>
@@ -1429,17 +1624,11 @@ const AdminPanel = () => {
                         </select>
                         <button
                           type="button"
-                          onClick={() => {
-                            const project = (predictionProjects || []).find((p) => String(p?._id) === String(predictionProjectId));
-                            if (project) {
-                              buildPredictionsFromBomItems(project?.bomItems || [], `project:${project?._id || ''}`);
-                              setPredictionUploadMeta({ fileName: `${project?.code || 'project'}_bom`, rows: (project?.bomItems || []).length });
-                            }
-                          }}
+                          onClick={async () => runPredictionFromProject(predictionProjectId)}
                           className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                          disabled={!predictionProjectId || predictionLoading}
+                          disabled={!predictionProjectId || predictionLoading || predictionRunLoading}
                         >
-                          Generate
+                          {predictionRunLoading ? 'Generating…' : 'Generate'}
                         </button>
                       </div>
                       <div className="text-[11px] font-semibold text-slate-600">
@@ -1448,50 +1637,31 @@ const AdminPanel = () => {
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                      <div className="text-xs font-extrabold text-slate-700">Upload BOM (CSV)</div>
+                      <div className="text-xs font-extrabold text-slate-700">Upload BOM (Excel/CSV)</div>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input
                           type="file"
-                          accept=".csv,text/csv"
+                          accept=".xlsx,.xls,.csv,text/csv"
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            try {
-                              const text = await file.text();
-                              const rows = parseCsvText(text);
-                              const headers = Object.keys(rows[0] || {});
-                              const findKey = (preds) => {
-                                const lc = headers.map((h) => ({ h, k: String(h).toLowerCase() }));
-                                for (const p of preds) {
-                                  const found = lc.find((x) => x.k.includes(p));
-                                  if (found) return found.h;
-                                }
-                                return '';
-                              };
-                              const nameKey = findKey(['nomenclature', 'description', 'item', 'name', 'part']);
-                              const qtyKey = findKey(['totalqtywithspare', 'total qty', 'totalqty', 'qty', 'quantity']);
-                              const bom = rows.map((r) => ({
-                                nomenclatureDescription: String(r?.[nameKey] || r?.Name || r?.Item || r?.Description || '').trim(),
-                                totalQtyWithSpare: Number(r?.[qtyKey] || r?.Qty || r?.Quantity || r?.TotalQty || r?.Total || 0)
-                              }));
-                              setPredictionUploadMeta({ fileName: file.name, rows: rows.length });
-                              buildPredictionsFromBomItems(bom, `upload:${file.name}`);
-                              e.target.value = '';
-                            } catch (err) {
-                              setPredictionError(err?.message || 'Failed to parse CSV');
-                            }
+                            await runPredictionFromUpload(file);
+                            e.target.value = '';
                           }}
                           className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-3 file:py-1.5 file:text-xs file:font-extrabold file:text-slate-700 hover:file:bg-slate-300"
+                          disabled={predictionRunLoading}
                         />
                         <button
                           type="button"
                           onClick={() => {
                             setPredictionRows([]);
                             setPredictionGeneratedAt('');
+                            setPredictionSummary(null);
                             setPredictionUploadMeta({ fileName: '', rows: 0 });
                             setPredictionError('');
                           }}
                           className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                          disabled={predictionRunLoading}
                         >
                           Clear
                         </button>
@@ -1518,6 +1688,11 @@ const AdminPanel = () => {
                           Generated: {formatDateTime(predictionGeneratedAt)}
                         </span>
                       ) : null}
+                      {predictionSummary ? (
+                        <span className="ml-2 text-[11px] font-semibold text-slate-500">
+                          • Dropped {predictionSummary.droppedRows || 0} rows • Low stock {predictionSummary.lowStockItems || 0} • Purchase {predictionSummary.purchaseItems || 0} • Critical {predictionSummary.criticalItems || 0} • Reorder {predictionSummary.reorderItems || 0} • Est. spend {formatRupees(predictionSummary.estimatedSpend || 0)}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -1525,11 +1700,18 @@ const AdminPanel = () => {
                         onClick={() => {
                           const rows = (predictionRows || []).map((r) => ({
                             Item: r.itemName,
-                            RequiredQty: r.required,
+                            InventorySKU: r?.inventory?.sku || '',
+                            InventoryAssetId: r?.inventory?.assetId || '',
+                            RequiredBomQty: r.requiredBomQty,
+                            PredictedDemand: r.predictedDemandHorizon,
+                            HorizonDays: r.horizonDays,
                             CurrentStock: r.currentStock,
                             SafetyStock: r.safetyStock,
-                            PredictedDemand30d: r.predictedDemand30d,
+                            ReorderPoint: r.reorderPoint,
                             RecommendedPurchase: r.recommendedPurchase,
+                            ShortageToBom: r.shortageToBom,
+                            ShortageToForecast: r.shortageToForecast,
+                            IsLowStock: r.isLowStock ? 'yes' : 'no',
                             Status: r.status
                           }));
                           downloadCsv('prediction_inventory.csv', rows);
@@ -1544,22 +1726,24 @@ const AdminPanel = () => {
                   </div>
 
                   <div className="w-full overflow-auto">
-                    <table className="min-w-[1100px] w-full text-left text-xs">
+                    <table className="min-w-[1400px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Item</th>
+                          <th className="px-4 py-3">Inventory</th>
                           <th className="px-4 py-3">Required (BOM)</th>
                           <th className="px-4 py-3">Current stock</th>
                           <th className="px-4 py-3">Safety stock</th>
-                          <th className="px-4 py-3">Predicted demand (30d)</th>
+                          <th className="px-4 py-3">Predicted demand</th>
                           <th className="px-4 py-3">Recommended purchase</th>
                           <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {predictionRows.length === 0 ? (
                           <tr>
-                            <td className="px-4 py-6 text-slate-500" colSpan={7}>
+                            <td className="px-4 py-6 text-slate-500" colSpan={9}>
                               Upload a BOM or select a project to see inventory prediction results.
                             </td>
                           </tr>
@@ -1570,16 +1754,35 @@ const AdminPanel = () => {
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 : r.status === 'Reorder'
                                   ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                  : 'bg-rose-50 text-rose-700 border-rose-200';
+                                  : r.status === 'Monitor'
+                                    ? 'bg-slate-50 text-slate-700 border-slate-200'
+                                    : r.status === 'Unmatched'
+                                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200';
                             return (
                               <tr key={r.itemName} className="hover:bg-slate-50/70">
                                 <td className="px-4 py-3">
                                   <div className="font-extrabold text-slate-900">{r.itemName}</div>
                                 </td>
-                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.required}</td>
-                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.currentStock}</td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">
+                                  {r?.inventory?.sku || r?.inventory?.assetId ? (
+                                    <div className="space-y-0.5">
+                                      <div>{r?.inventory?.sku || r?.inventory?.assetId}</div>
+                                      <div className="text-slate-500">{r?.inventory?.department || ''}</div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-500">—</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.requiredBomQty}</td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">
+                                  <span className={r.isLowStock ? 'text-rose-700 font-extrabold' : ''}>{r.currentStock}</span>
+                                </td>
                                 <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.safetyStock}</td>
-                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{r.predictedDemand30d}</td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">
+                                  {r.predictedDemandHorizon}
+                                  <span className="ml-1 text-slate-500">({r.horizonDays}d)</span>
+                                </td>
                                 <td className="px-4 py-3">
                                   <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-800">
                                     {r.recommendedPurchase}
@@ -1589,6 +1792,9 @@ const AdminPanel = () => {
                                   <span className={['inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-extrabold', pill].join(' ')}>
                                     {r.status}
                                   </span>
+                                </td>
+                                <td className="px-4 py-3 text-[11px] font-semibold text-slate-600 max-w-[520px]">
+                                  <div className="truncate" title={r.action || ''}>{r.action || ''}</div>
                                 </td>
                               </tr>
                             );
@@ -2295,12 +2501,31 @@ const AdminPanel = () => {
                           setCompanySettingsSuccess('');
                           setCompanySettingsSaving(true);
                           try {
-                            localStorage.setItem('admin_company_directory_v1', JSON.stringify(companyDirectory || []));
-                            localStorage.setItem('admin_selected_company_id', String(selectedCompanyId || ''));
-                            localStorage.setItem('admin_selected_company_location', String(selectedCompanyLocation || ''));
-                            setCompanySettingsSuccess('Company directory saved');
+                            const res = await api.put('/settings/admin', {
+                              companyDirectory,
+                              assetCategories,
+                              selectedCompanyId,
+                              selectedCompanyLocation
+                            });
+                            const dir = Array.isArray(res.data?.companyDirectory) ? res.data.companyDirectory : [];
+                            const categories = Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0
+                              ? res.data.assetCategories
+                              : ASSET_CATEGORIES;
+                            const selectedId = String(res.data?.selectedCompanyId || '');
+                            const selectedLocation = String(res.data?.selectedCompanyLocation || '');
+                            setCompanyDirectory(dir);
+                            setAssetCategories(categories);
+                            setSelectedCategoryName((prev) => (prev && categories.includes(prev) ? prev : String(categories[0] || '')));
+                            setRenameCategoryName((prev) => {
+                              const trimmed = String(prev || '').trim();
+                              if (trimmed) return trimmed;
+                              return String(categories[0] || '');
+                            });
+                            setSelectedCompanyId(selectedId);
+                            setSelectedCompanyLocation(selectedLocation);
+                            setCompanySettingsSuccess('Company, location and category settings saved to database');
                           } catch (err) {
-                            setCompanySettingsError(err?.message || 'Failed to save company directory');
+                            setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to save company directory');
                           } finally {
                             setCompanySettingsSaving(false);
                           }
@@ -2327,8 +2552,8 @@ const AdminPanel = () => {
                               const id = String(a?._id || '');
                               if (!id) continue;
                               await api.put(`/inventory/update/${encodeURIComponent(id)}`, {
-                                'metadata.companyName': companyName,
-                                'metadata.companyLocation': selectedCompanyLocation
+                                company: companyName,
+                                location: selectedCompanyLocation
                               });
                               done += 1;
                               setBulkProgress({ mode: 'company', done, total: assets.length });
@@ -2521,84 +2746,149 @@ const AdminPanel = () => {
                       </div>
                     </div>
                   </div>
+
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setCompanySettingsError('');
+                        setCompanySettingsSuccess('');
+                        setCompanySettingsSaving(true);
+                        try {
+                          const res = await api.put('/settings/admin', { assetCategories });
+                          const categories = Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0
+                            ? res.data.assetCategories
+                            : ASSET_CATEGORIES;
+                          setAssetCategories(categories);
+                          setSelectedCategoryName((prev) => (prev && categories.includes(prev) ? prev : String(categories[0] || '')));
+                          setRenameCategoryName((prev) => {
+                            const trimmed = String(prev || '').trim();
+                            if (trimmed) return trimmed;
+                            return String(categories[0] || '');
+                          });
+                          setCompanySettingsSuccess('Category settings saved to database');
+                        } catch (err) {
+                          setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to save categories');
+                        } finally {
+                          setCompanySettingsSaving(false);
+                        }
+                      }}
+                      className="h-9 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                      disabled={bulkApplying || companySettingsSaving}
+                    >
+                      Save categories
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="min-w-0">
-                      <h2 className="text-sm font-extrabold text-slate-900">Asset Location</h2>
-                      <p className="text-xs text-slate-500">This maps to inventory location field (warehouse/office/lab).</p>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <select
-                        value={assetLocation}
-                        onChange={(e) => setAssetLocation(e.target.value)}
-                        className="h-9 w-full sm:w-56 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
-                        disabled={bulkApplying || companySettingsSaving}
-                      >
-                        {(ASSET_LOCATIONS || ['warehouse', 'office', 'lab']).map((l) => (
-                          <option key={l} value={l}>
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setCompanySettingsError('');
-                          setCompanySettingsSuccess('');
-                          setCompanySettingsSaving(true);
-                          try {
-                            localStorage.setItem('admin_asset_location', assetLocation);
-                            setCompanySettingsSuccess('Asset location saved');
-                          } catch (err) {
-                            setCompanySettingsError(err?.message || 'Failed to save asset location');
-                          } finally {
-                            setCompanySettingsSaving(false);
-                          }
-                        }}
-                        className="h-9 w-full sm:w-auto rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
-                        disabled={bulkApplying || companySettingsSaving}
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          setCompanySettingsError('');
-                          setCompanySettingsSuccess('');
-                          setBulkApplying(true);
-                          try {
-                            const assets = await fetchAllAssets();
-                            setBulkProgress({ mode: 'asset_location', done: 0, total: assets.length });
-                            let done = 0;
-                            for (const a of assets) {
-                              const id = String(a?._id || '');
-                              if (!id) continue;
-                              await api.put(`/inventory/update/${encodeURIComponent(id)}`, { location: assetLocation });
-                              done += 1;
-                              setBulkProgress({ mode: 'asset_location', done, total: assets.length });
-                            }
-                            setCompanySettingsSuccess(`Location applied to ${done} assets`);
-                          } catch (err) {
-                            setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to apply location to assets');
-                          } finally {
-                            setBulkApplying(false);
-                          }
-                        }}
-                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        disabled={bulkApplying || companySettingsSaving}
-                      >
-                        Apply to all assets
-                      </button>
+                      <h2 className="text-sm font-extrabold text-slate-900">Asset Categories</h2>
+                      <p className="text-xs text-slate-500">Add, update or delete categories shown in Add Inventory.</p>
                     </div>
                   </div>
 
-                  {bulkApplying && bulkProgress.mode === 'asset_location' && (
-                    <div className="mt-3 text-xs font-semibold text-slate-600">
-                      Applying location… {bulkProgress.done} / {bulkProgress.total}
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">Add category</div>
+                      <div className="flex gap-2">
+                        <input
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="New category name"
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const next = String(newCategoryName || '').trim();
+                            if (!next) return;
+                            const list = Array.isArray(assetCategories) ? assetCategories : [];
+                            const exists = list.some((c) => String(c || '').trim().toLowerCase() === next.toLowerCase());
+                            if (exists) return;
+                            const nextList = [...list, next];
+                            setNewCategoryName('');
+                            await persistAssetCategories(nextList, 'Category added and saved');
+                          }}
+                          className="h-9 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                          disabled={bulkApplying || companySettingsSaving}
+                        >
+                          Add
+                        </button>
+                      </div>
                     </div>
-                  )}
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">Update/Delete</div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <select
+                          value={selectedCategoryName}
+                          onChange={(e) => {
+                            setSelectedCategoryName(e.target.value);
+                            setRenameCategoryName(e.target.value);
+                          }}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        >
+                          {(assetCategories || []).length === 0 ? (
+                            <option value="">No categories</option>
+                          ) : (
+                            (assetCategories || []).map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        <input
+                          value={renameCategoryName}
+                          onChange={(e) => setRenameCategoryName(e.target.value)}
+                          placeholder="Rename selected category"
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const current = String(selectedCategoryName || '').trim();
+                            const next = String(renameCategoryName || '').trim();
+                            if (!current || !next) return;
+                            const list = Array.isArray(assetCategories) ? assetCategories : [];
+                            const duplicate = list.some((c) => {
+                              const key = String(c || '').trim().toLowerCase();
+                              return key === next.toLowerCase() && key !== current.toLowerCase();
+                            });
+                            if (duplicate) return;
+                            const nextList = list.map((c) => (String(c) === current ? next : c));
+                            await persistAssetCategories(nextList, 'Category updated and saved');
+                          }}
+                          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                          disabled={bulkApplying || companySettingsSaving || !selectedCategoryName}
+                        >
+                          Update
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const current = String(selectedCategoryName || '').trim();
+                            if (!current) return;
+                            const list = Array.isArray(assetCategories) ? assetCategories : [];
+                            const nextList = list.filter((c) => String(c) !== current);
+                            const finalList = nextList.length > 0 ? nextList : ASSET_CATEGORIES;
+                            await persistAssetCategories(finalList, 'Category deleted and saved');
+                          }}
+                          className="h-9 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-extrabold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                          disabled={bulkApplying || companySettingsSaving || !selectedCategoryName}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -2626,10 +2916,12 @@ const AdminPanel = () => {
                           setCompanySettingsSuccess('');
                           setCompanySettingsSaving(true);
                           try {
-                            localStorage.setItem('admin_default_low_stock_threshold', String(defaultLowStockThreshold));
-                            setCompanySettingsSuccess('Default threshold saved');
+                            const res = await api.put('/settings/admin', { defaultLowStockThreshold });
+                            const n = Number(res.data?.defaultLowStockThreshold);
+                            setDefaultLowStockThreshold(Number.isFinite(n) && n >= 0 ? n : defaultLowStockThreshold);
+                            setCompanySettingsSuccess('Default threshold saved to database');
                           } catch (err) {
-                            setCompanySettingsError(err?.message || 'Failed to save threshold');
+                            setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to save threshold');
                           } finally {
                             setCompanySettingsSaving(false);
                           }

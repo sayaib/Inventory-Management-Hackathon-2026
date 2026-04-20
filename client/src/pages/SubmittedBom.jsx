@@ -103,13 +103,13 @@ const getInventoryStatusMeta = (statusRaw) => {
   if (status === 'Assigned') {
     return {
       label: 'Assigned',
-      className: 'bg-primary-50 text-primary-700 border-primary-100'
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200'
     };
   }
   if (status === 'Pending') {
     return {
       label: 'Pending',
-      className: 'bg-slate-50 text-slate-700 border-slate-200'
+      className: 'bg-amber-50 text-amber-700 border-amber-200'
     };
   }
   if (status === 'Need to Purchase') {
@@ -521,8 +521,8 @@ const SubmittedBom = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+    <div className="min-h-screen app-bg">
+      <nav className="app-nav">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -572,7 +572,7 @@ const SubmittedBom = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <div className="app-card p-5 space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <div className="text-base font-extrabold text-gray-900">Projects by Department</div>
@@ -580,14 +580,14 @@ const SubmittedBom = () => {
             </div>
             <div className="flex items-center gap-2">
               {lockDepartment ? (
-                <div className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg font-extrabold text-gray-700">
+                <div className="px-3 py-2 text-sm bg-white/60 border border-slate-200/70 rounded-lg font-extrabold text-gray-700 backdrop-blur">
                   {userDept}
                 </div>
               ) : (
                 <select
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                  className="px-3 py-2 text-sm bg-white/60 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 font-bold backdrop-blur"
                 >
                   <option value="all">All Departments</option>
                   {departments.map((d) => (
@@ -615,14 +615,14 @@ const SubmittedBom = () => {
               {grouped.map(([dept, list]) => {
                 const totalItems = list.reduce((acc, p) => acc + (p.bomItems?.length || 0), 0);
                 return (
-                  <div key={dept} className="border border-gray-200 rounded-2xl overflow-hidden">
-                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                  <div key={dept} className="border border-slate-200/70 rounded-2xl overflow-hidden bg-white/60 backdrop-blur">
+                    <div className="px-4 py-3 bg-gradient-to-r from-primary-50 via-white to-accent-50 border-b border-slate-200/60 flex items-center justify-between">
                       <div className="text-sm font-extrabold text-gray-900">{dept}</div>
                       <div className="text-xs font-black text-gray-500">
                         {list.length} projects • {totalItems} BOM items
                       </div>
                     </div>
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-slate-100">
                       {list.map((p) => {
                         const summary = projectSummaries[p._id] || {};
                         const summaryLoading = Boolean(summary.loading);
@@ -638,7 +638,7 @@ const SubmittedBom = () => {
                         }
 
                         return (
-                        <div key={p._id} className="px-4 py-3">
+                        <div key={p._id} className="px-4 py-3 hover:bg-white/50 transition-colors">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="text-sm font-extrabold text-gray-900">{p.name}</div>

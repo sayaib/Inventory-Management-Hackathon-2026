@@ -28,13 +28,13 @@ const getInventoryStatusMeta = (bomItem) => {
   if (status === 'Assigned') {
     return {
       label: 'Assigned',
-      className: 'bg-primary-50 text-primary-700 border-primary-100'
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200'
     };
   }
   if (status === 'Pending') {
     return {
       label: 'Pending',
-      className: 'bg-slate-50 text-slate-700 border-slate-200'
+      className: 'bg-amber-50 text-amber-700 border-amber-200'
     };
   }
   if (status === 'Need to Purchase') {
@@ -76,8 +76,8 @@ const ViewBom = () => {
   }, [fetchProject]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200">
+    <div className="min-h-screen app-bg">
+      <nav className="app-nav">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -113,7 +113,7 @@ const ViewBom = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <div className="app-card p-5 space-y-4">
           {loading ? (
             <div className="text-sm text-gray-500 py-6">Loading…</div>
           ) : error ? (
@@ -142,16 +142,16 @@ const ViewBom = () => {
         </div>
 
         {project && (project.bomItems?.length || 0) > 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <div className="app-card p-5 space-y-4">
             <div className="space-y-1">
               <div className="text-base font-extrabold text-gray-900">Saved BOM</div>
               <div className="text-xs text-gray-500 font-bold">
                 Note: highlighted cells were edited by Inventory Manager.
               </div>
             </div>
-            <div className="overflow-auto border border-gray-200 rounded-xl">
+            <div className="overflow-auto border border-slate-200/70 rounded-xl bg-white/60 backdrop-blur">
               <table className="min-w-[2550px] w-full text-[11px]">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-gradient-to-r from-primary-50 via-white to-accent-50 border-b border-slate-200/60">
                   <tr className="text-[11px] font-black text-gray-700">
                     <th className="px-2 py-2 text-left">Type of Component</th>
                     <th className="px-2 py-2 text-left">Sr. No.</th>

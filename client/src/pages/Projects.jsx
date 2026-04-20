@@ -35,13 +35,13 @@ const getInventoryStatusMeta = (bomItem) => {
   if (status === 'Assigned') {
     return {
       label: 'Assigned',
-      className: 'bg-primary-50 text-primary-700 border-primary-100'
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200'
     };
   }
   if (status === 'Pending') {
     return {
       label: 'Pending',
-      className: 'bg-slate-50 text-slate-700 border-slate-200'
+      className: 'bg-amber-50 text-amber-700 border-amber-200'
     };
   }
   if (status === 'Need to Purchase') {
@@ -348,8 +348,8 @@ const Projects = () => {
   }, [materialsQuery, selectedProjectMaterials]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <nav className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
+    <div className="min-h-screen app-bg">
+      <nav className="app-nav sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3">
@@ -391,9 +391,10 @@ const Projects = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="space-y-6">
           {canCreateProject && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4 lg:col-span-3">
+            <div className="flex justify-center">
+              <div className="app-card p-5 space-y-4 w-full max-w-7xl">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
@@ -403,7 +404,7 @@ const Projects = () => {
                   <div className="text-xs text-gray-500 mt-1">Create a new project (IWO-based) and start tracking BOM/materials.</div>
                 </div>
               </div>
-              <form className="space-y-3" onSubmit={handleCreateProject}>
+              <form onSubmit={handleCreateProject} className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <div className="space-y-1">
                   <label htmlFor="create-iwo" className="text-xs font-extrabold text-gray-700">IWO No</label>
                   <input
@@ -450,7 +451,7 @@ const Projects = () => {
                     <option value="DTMA">DTMA</option>
                   </select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 lg:col-span-4">
                   <label htmlFor="create-desc" className="text-xs font-extrabold text-gray-700">Description</label>
                   <textarea
                     id="create-desc"
@@ -461,18 +462,22 @@ const Projects = () => {
                     disabled={creatingProject}
                   />
                 </div>
-                <button
-                  type="submit"
-                  disabled={creatingProject}
-                  className="w-full px-4 py-2.5 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {creatingProject ? 'Creating…' : 'Create'}
-                </button>
+                <div className="flex justify-center lg:col-span-4">
+                  <button
+                    type="submit"
+                    disabled={creatingProject}
+                    className="px-10 py-2.5 rounded-lg bg-primary text-white font-bold text-sm hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingProject ? 'Creating…' : 'Create'}
+                  </button>
+                </div>
               </form>
+              </div>
             </div>
           )}
 
-          <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4 ${canCreateProject ? 'lg:col-span-4' : 'lg:col-span-4'}`}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="app-card p-5 space-y-4 lg:col-span-4">
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -624,7 +629,7 @@ const Projects = () => {
             </div>
           </div>
 
-          <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-5 ${canCreateProject ? 'lg:col-span-5' : 'lg:col-span-8'}`}>
+          <div className="app-card p-5 space-y-5 lg:col-span-8">
             {selectedProject ? (
               <>
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
@@ -1024,6 +1029,7 @@ const Projects = () => {
             ) : (
               <div className="text-sm text-gray-500">Select a project to view BOM and allocated materials.</div>
             )}
+          </div>
           </div>
         </div>
       </main>

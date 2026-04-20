@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Asset = require('../models/Asset');
+const AdminSettings = require('../models/AdminSettings');
 const InventoryLog = require('../models/InventoryLog');
 const Project = require('../models/Project');
 const User = require('../models/User');
@@ -11,6 +12,66 @@ const { recordAuditLog } = require('../utils/recordAuditLog');
 const router = express.Router();
 
 const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLowerCase();
+
+const normalizeTrimmedStringOrEmpty = (value) => {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+};
+
+const normalizeOptionalDateOrNull = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+};
+
+const buildAssetWritePayload = (raw) => {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const payload = {
+    assetId: normalizeTrimmedStringOrEmpty(src.assetId),
+    sku: normalizeTrimmedStringOrEmpty(src.sku),
+    itemName: normalizeTrimmedStringOrEmpty(src.itemName),
+    category: normalizeTrimmedStringOrEmpty(src.category),
+    department: normalizeTrimmedStringOrEmpty(src.department),
+    subDepartment: normalizeTrimmedStringOrEmpty(src.subDepartment),
+    totalQuantity: src.totalQuantity,
+    availableQuantity: src.availableQuantity,
+    allocatedQuantity: src.allocatedQuantity,
+    lowStockThreshold: src.lowStockThreshold,
+    unit: normalizeTrimmedStringOrEmpty(src.unit),
+    status: normalizeTrimmedStringOrEmpty(src.status),
+    company: normalizeTrimmedStringOrEmpty(src.company),
+    location: normalizeTrimmedStringOrEmpty(src.location),
+    assignedTo: normalizeTrimmedStringOrEmpty(src.assignedTo),
+    purchaseCost: src.purchaseCost,
+    vendorName: normalizeTrimmedStringOrEmpty(src.vendorName),
+    invoiceNumber: normalizeTrimmedStringOrEmpty(src.invoiceNumber),
+    purchaseDate: normalizeOptionalDateOrNull(src.purchaseDate),
+    warrantyExpiry: normalizeOptionalDateOrNull(src.warrantyExpiry),
+    maintenanceSchedule: normalizeTrimmedStringOrEmpty(src.maintenanceSchedule),
+    metadata: src.metadata && typeof src.metadata === 'object' ? src.metadata : {}
+  };
+
+  for (const key of Object.keys(payload)) {
+    if (payload[key] === undefined) delete payload[key];
+  }
+
+  if (!payload.assetId) delete payload.assetId;
+  if (!payload.sku) delete payload.sku;
+  if (!payload.subDepartment) delete payload.subDepartment;
+  if (!payload.unit) delete payload.unit;
+  if (!payload.status) delete payload.status;
+  if (!payload.company) delete payload.company;
+  if (!payload.location) delete payload.location;
+  if (!payload.assignedTo) delete payload.assignedTo;
+  if (!payload.vendorName) delete payload.vendorName;
+  if (!payload.invoiceNumber) delete payload.invoiceNumber;
+  if (!payload.maintenanceSchedule) delete payload.maintenanceSchedule;
+  if (payload.purchaseDate === null) delete payload.purchaseDate;
+  if (payload.warrantyExpiry === null) delete payload.warrantyExpiry;
+
+  return payload;
+};
 
 router.get('/logs/trend', authMiddleware, async (req, res) => {
   try {
@@ -218,11 +279,22 @@ router.get('/id/:id', authMiddleware, async (req, res) => {
 // Create new asset (Admin and Inventory Manager)
 router.post('/add', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
   try {
-    const assetData = req.body;
+    const assetData = buildAssetWritePayload(req.body);
     
     // Auto-calculate available quantity if not provided
     if (assetData.totalQuantity && !assetData.availableQuantity) {
       assetData.availableQuantity = assetData.totalQuantity - (assetData.allocatedQuantity || 0);
+    }
+
+    if (assetData.lowStockThreshold === undefined || assetData.lowStockThreshold === null) {
+      try {
+        const settings = await AdminSettings.findOne({ key: 'admin' })
+          .select('defaultLowStockThreshold')
+          .lean();
+        const n = Number(settings?.defaultLowStockThreshold);
+        if (Number.isFinite(n) && n >= 0) assetData.lowStockThreshold = n;
+      } catch {
+      }
     }
 
     const newAsset = new Asset(assetData);
@@ -801,7 +873,7 @@ router.get('/finance/wastage-analytics', authMiddleware, roleMiddleware([ROLES.F
 // Update stock/asset details
 router.put('/update/:id', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INVENTORY_MANAGER]), async (req, res) => {
   try {
-    const updateData = req.body;
+    const updateData = buildAssetWritePayload(req.body);
     
     // Auto-calculate available quantity if quantity fields are updated
     if (updateData.totalQuantity !== undefined || updateData.allocatedQuantity !== undefined) {
@@ -811,7 +883,11 @@ router.put('/update/:id', authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.INV
       updateData.availableQuantity = total - allocated;
     }
 
-    const updatedAsset = await Asset.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    const updatedAsset = await Asset.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
     if (!updatedAsset) return res.status(404).json({ message: 'Asset not found' });
 
     await recordAuditLog({

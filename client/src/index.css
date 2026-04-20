@@ -22,3 +22,55 @@
   --color-muted-700: color-mix(in oklab, #727371 85%, black);
   --color-muted-800: color-mix(in oklab, #727371 72%, black);
 }
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: #f8fafc;
+    background-image:
+      radial-gradient(650px 360px at 10% 12%, rgba(23, 62, 119, 0.22), transparent 60%),
+      radial-gradient(560px 340px at 92% 0%, rgba(198, 34, 34, 0.18), transparent 56%),
+      radial-gradient(620px 360px at 90% 92%, rgba(16, 185, 129, 0.16), transparent 62%),
+      radial-gradient(560px 330px at 0% 92%, rgba(99, 102, 241, 0.14), transparent 60%);
+  }
+}
+
+@layer utilities {
+  .app-bg {
+    background-color: #f8fafc;
+    background-image:
+      radial-gradient(650px 360px at 10% 12%, rgba(23, 62, 119, 0.22), transparent 60%),
+      radial-gradient(560px 340px at 92% 0%, rgba(198, 34, 34, 0.18), transparent 56%),
+      radial-gradient(620px 360px at 90% 92%, rgba(16, 185, 129, 0.16), transparent 62%),
+      radial-gradient(560px 330px at 0% 92%, rgba(99, 102, 241, 0.14), transparent 60%);
+  }
+
+  .app-nav {
+    @apply bg-white/70 backdrop-blur border-b border-slate-200/60;
+  }
+
+  .app-card {
+    @apply rounded-2xl border border-slate-200/70 bg-white/75 backdrop-blur shadow-sm;
+  }
+
+  .app-card-strong {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .app-tabbar {
+    @apply flex gap-2 p-1 rounded-2xl border border-slate-200/60 bg-white/60 backdrop-blur w-fit;
+  }
+
+  .app-tab-active {
+    @apply bg-gradient-to-r from-primary to-primary-700 text-white shadow-md shadow-primary/15 font-extrabold;
+  }
+
+  .app-tab-idle {
+    @apply text-slate-600 font-bold hover:bg-white/70;
+  }
+}
