@@ -1,6 +1,6 @@
 const express = require('express');
 const AdminSettings = require('../models/AdminSettings');
-const { ASSET_CATEGORIES } = require('../constants/assets');
+const { ASSET_CATEGORIES, DEPARTMENTS } = require('../constants/assets');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { ROLES } = require('../constants/roles');
 
@@ -53,12 +53,28 @@ const normalizeAssetCategories = (value) => {
   return normalized.length > 0 ? normalized : ASSET_CATEGORIES;
 };
 
+const normalizeDepartments = (value) => {
+  const list = Array.isArray(value) ? value : [];
+  const seen = new Set();
+  const normalized = [];
+  for (const raw of list) {
+    const name = typeof raw === 'string' ? raw.trim() : '';
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(name);
+  }
+  return normalized.length > 0 ? normalized : DEPARTMENTS;
+};
+
 router.get('/company-directory', authMiddleware, async (req, res) => {
   try {
     const doc = await AdminSettings.findOne({ key: 'admin' }).lean();
     res.json({
       companyDirectory: Array.isArray(doc?.companyDirectory) ? doc.companyDirectory : [],
       assetCategories: normalizeAssetCategories(doc?.assetCategories),
+      departments: normalizeDepartments(doc?.departments),
       selectedCompanyId: normalizeString(doc?.selectedCompanyId),
       selectedCompanyLocation: normalizeString(doc?.selectedCompanyLocation),
       updatedAt: doc?.updatedAt
@@ -78,6 +94,7 @@ router.get('/admin', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, 
       defaultLowStockThreshold: doc.defaultLowStockThreshold ?? 5,
       companyDirectory: Array.isArray(doc.companyDirectory) ? doc.companyDirectory : [],
       assetCategories: normalizeAssetCategories(doc.assetCategories),
+      departments: normalizeDepartments(doc.departments),
       selectedCompanyId: normalizeString(doc.selectedCompanyId),
       selectedCompanyLocation: normalizeString(doc.selectedCompanyLocation),
       updatedAt: doc.updatedAt
@@ -107,6 +124,10 @@ router.put('/admin', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, 
       update.assetCategories = normalizeAssetCategories(req.body.assetCategories);
     }
 
+    if (req.body?.departments !== undefined) {
+      update.departments = normalizeDepartments(req.body.departments);
+    }
+
     if (req.body?.selectedCompanyId !== undefined) {
       update.selectedCompanyId = normalizeString(req.body.selectedCompanyId);
     }
@@ -126,6 +147,7 @@ router.put('/admin', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, 
       defaultLowStockThreshold: doc.defaultLowStockThreshold ?? 5,
       companyDirectory: Array.isArray(doc.companyDirectory) ? doc.companyDirectory : [],
       assetCategories: normalizeAssetCategories(doc.assetCategories),
+      departments: normalizeDepartments(doc.departments),
       selectedCompanyId: normalizeString(doc.selectedCompanyId),
       selectedCompanyLocation: normalizeString(doc.selectedCompanyLocation),
       updatedAt: doc.updatedAt

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Loader2, Save, Trash2, User as UserIcon, ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { DEPARTMENTS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -33,9 +34,23 @@ const Profile = () => {
 
   const [username, setUsername] = useState('');
   const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [departments, setDepartments] = useState(DEPARTMENTS);
 
   const email = user?.email || '';
   const role = user?.role || '';
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setDepartments(list);
+      } catch {
+        setDepartments(DEPARTMENTS);
+      }
+    };
+    loadDepartments();
+  }, []);
 
   const canSubmit = useMemo(() => {
     if (!username?.trim()) return false;
@@ -199,12 +214,37 @@ const Profile = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Department</label>
-                <input
+                <select
                   name="department"
                   value={profile.department}
                   onChange={handleProfileChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary text-sm"
-                />
+                >
+                  <option value="">Unassigned</option>
+                  {(() => {
+                    const list = Array.isArray(departments) ? departments : [];
+                    const unique = [];
+                    const seen = new Set();
+                    const current = String(profile.department || '').trim();
+                    if (current) {
+                      unique.push(current);
+                      seen.add(current.toLowerCase());
+                    }
+                    for (const d of list) {
+                      const value = String(d || '').trim();
+                      if (!value) continue;
+                      const key = value.toLowerCase();
+                      if (seen.has(key)) continue;
+                      seen.add(key);
+                      unique.push(value);
+                    }
+                    return unique.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ));
+                  })()}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Job Title</label>

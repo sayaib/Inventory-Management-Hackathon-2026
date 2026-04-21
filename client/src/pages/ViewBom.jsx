@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+import { ROLES } from '../constants/roles';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -10,6 +12,27 @@ const formatMoney = (value) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return '0.00';
   return parsed.toFixed(2);
+};
+
+const toNumberOrZero = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const computeLandingCostPerUnit = (bomItem) => {
+  const unitCost = Math.max(0, toNumberOrZero(bomItem?.unitCost));
+  const additionalCostRaw = bomItem?.additionalCost;
+  const additionalCost =
+    additionalCostRaw === undefined || additionalCostRaw === null || String(additionalCostRaw).trim() === ''
+      ? 1
+      : Math.max(0, toNumberOrZero(additionalCostRaw));
+  return Math.max(0, unitCost * additionalCost);
+};
+
+const computeTotalPrice = (bomItem) => {
+  const landingCostPerUnit = computeLandingCostPerUnit(bomItem);
+  const totalQtyWithSpare = Math.max(0, toNumberOrZero(bomItem?.totalQtyWithSpare));
+  return Math.max(0, landingCostPerUnit * totalQtyWithSpare);
 };
 
 const isInventoryManagerEdited = (bomItem, field) => {
@@ -23,8 +46,21 @@ const cellClass = (bomItem, field) => (
 
 const getInventoryStatusMeta = (bomItem) => {
   const hasLink = Boolean(bomItem?.inventoryAssetId || bomItem?.inventorySku);
-  const incoming = hasLink ? 'Assigned' : String(bomItem?.inventoryStatus || '').trim();
-  const status = incoming || 'Pending';
+  const incoming = String(bomItem?.inventoryStatus || '').trim();
+  const status = incoming || (hasLink ? 'Assigned' : 'Pending');
+  
+  if (status === 'Utilized') {
+    return {
+      label: 'Utilized',
+      className: 'bg-primary-50 text-primary-700 border-primary-200'
+    };
+  }
+  if (status === 'Non Utilized') {
+    return {
+      label: 'Non Utilized',
+      className: 'bg-gray-50 text-gray-700 border-gray-200'
+    };
+  }
   if (status === 'Assigned') {
     return {
       label: 'Assigned',
@@ -52,9 +88,12 @@ const getInventoryStatusMeta = (bomItem) => {
 const ViewBom = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const fetchProject = useCallback(async () => {
     if (!projectId) return;
@@ -70,6 +109,17 @@ const ViewBom = () => {
       setLoading(false);
     }
   }, [projectId]);
+
+  const handleUpdateBomStatus = useCallback(async (bomItemId, status) => {
+    if (!project) return;
+    try {
+      await api.put(`/projects/${project._id}/bom/${bomItemId}`, { inventoryStatus: status });
+      setSuccess(`Inventory status updated to ${status}`);
+      await fetchProject();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update status');
+    }
+  }, [project, fetchProject]);
 
   useEffect(() => {
     fetchProject();
@@ -113,13 +163,23 @@ const ViewBom = () => {
       </nav>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
+        {(error || success) && (
+          <div className="space-y-2">
+            {error && (
+              <div className="bg-accent-50 border border-accent-100 text-accent-700 px-4 py-3 rounded-xl text-sm font-bold">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="bg-primary-50 border border-primary-100 text-primary-700 px-4 py-3 rounded-xl text-sm font-bold">
+                {success}
+              </div>
+            )}
+          </div>
+        )}
         <div className="app-card p-5 space-y-4">
           {loading ? (
             <div className="text-sm text-gray-500 py-6">Loading…</div>
-          ) : error ? (
-            <div className="bg-accent-50 border border-accent-100 text-accent-700 px-4 py-3 rounded-xl text-sm font-bold">
-              {error}
-            </div>
           ) : project ? (
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
               <div>
@@ -200,8 +260,8 @@ const ViewBom = () => {
                         <td className={cellClass(b, 'totalQtyWithSpare')}>{b.totalQtyWithSpare ?? 0}</td>
                         <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
                         <td className={cellClass(b, 'additionalCost')}>{formatMoney(b.additionalCost)}</td>
-                        <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
-                        <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                        <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(computeLandingCostPerUnit(b))}</td>
+                        <td className={cellClass(b, 'totalPrice')}>{formatMoney(computeTotalPrice(b))}</td>
                         <td className={cellClass(b, 'moq')}>{b.moq ?? 0}</td>
                         <td className={cellClass(b, 'leadTime')}>{b.leadTime || '-'}</td>
                         <td className={cellClass(b, 'leadTimeWeeks')}>{b.leadTimeWeeks ?? 0}</td>
@@ -210,9 +270,29 @@ const ViewBom = () => {
                         <td className={cellClass(b, 'inventoryItemName')}>{b.inventoryItemName || '-'}</td>
                         <td className={cellClass(b, 'plannedQty')}>{b.plannedQty ?? 0}</td>
                         <td className={cellClass(b, 'inventoryStatus')}>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
-                            {statusMeta.label}
-                          </span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                              {statusMeta.label}
+                            </span>
+                            {isProjectManager && (b.inventoryAssetId || b.inventorySku) && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateBomStatus(b._id, 'Utilized')}
+                                  className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-primary text-white hover:bg-primary-700 transition-all"
+                                >
+                                  Utilized
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateBomStatus(b._id, 'Non Utilized')}
+                                  className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-gray-500 text-white hover:bg-gray-600 transition-all"
+                                >
+                                  Non Utilized
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                       </tr>

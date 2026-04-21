@@ -4,6 +4,7 @@ import { ClipboardList, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-reac
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
+import { DEPARTMENTS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -40,8 +41,11 @@ const computeDerived = ({ qtyPerBoard, boardReq, spareQty, unitCost, additionalC
   const totalQtyWithSpare = Math.max(0, qpb * boardReqWithSpare);
 
   const uc = Math.max(0, toNumberOrZero(unitCost));
-  const ac = Math.max(0, toNumberOrZero(additionalCost));
-  const landingCostPerUnit = Math.max(0, uc + ac);
+  const ac =
+    additionalCost === undefined || additionalCost === null || String(additionalCost).trim() === ''
+      ? 1
+      : Math.max(0, toNumberOrZero(additionalCost));
+  const landingCostPerUnit = Math.max(0, uc * ac);
   const totalPrice = Math.max(0, landingCostPerUnit * totalQtyWithSpare);
 
   return {
@@ -97,9 +101,22 @@ const getUtilizationMeta = ({ hasLink, plannedQty, usedQty }) => {
   };
 };
 
-const getInventoryStatusMeta = (statusRaw) => {
+const getInventoryStatusMeta = (statusRaw, bomItem) => {
+  const hasLink = Boolean(bomItem?.inventoryAssetId || bomItem?.inventorySku);
   const incoming = String(statusRaw || '').trim();
-  const status = incoming || 'Pending';
+  const status = incoming || (hasLink ? 'Assigned' : 'Pending');
+  if (status === 'Utilized') {
+    return {
+      label: 'Utilized',
+      className: 'bg-primary-50 text-primary-700 border-primary-200'
+    };
+  }
+  if (status === 'Non Utilized') {
+    return {
+      label: 'Non Utilized',
+      className: 'bg-gray-50 text-gray-700 border-gray-200'
+    };
+  }
   if (status === 'Assigned') {
     return {
       label: 'Assigned',
@@ -131,6 +148,7 @@ const SubmittedBom = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [settingsDepartments, setSettingsDepartments] = useState(DEPARTMENTS);
   const [expandedProjects, setExpandedProjects] = useState({});
   const [rowPlans, setRowPlans] = useState({});
   const [projectSummaries, setProjectSummaries] = useState({});
@@ -160,6 +178,19 @@ const SubmittedBom = () => {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setSettingsDepartments(list);
+      } catch {
+        setSettingsDepartments(DEPARTMENTS);
+      }
+    };
+    loadDepartments();
+  }, []);
 
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const isInventoryManager = user?.role === ROLES.INVENTORY_MANAGER;
@@ -247,9 +278,14 @@ const SubmittedBom = () => {
 
   const departments = useMemo(() => {
     const set = new Set();
+    for (const d of settingsDepartments || []) {
+      const next = typeof d === 'string' ? d.trim() : '';
+      if (next) set.add(next);
+    }
     for (const p of projects) set.add(normalizeDepartment(p.department));
+    set.add('Unassigned');
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [projects]);
+  }, [projects, settingsDepartments]);
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -352,7 +388,11 @@ const SubmittedBom = () => {
     const boardReq = Math.max(0, toNumberOrZero(plan.boardReq ?? bomItem?.boardReq ?? 0));
     const spareQty = Math.max(0, toNumberOrZero(plan.spareQty ?? bomItem?.spareQty ?? 0));
     const unitCost = Math.max(0, toNumberOrZero(plan.unitCost ?? bomItem?.unitCost ?? 0));
-    const additionalCost = Math.max(0, toNumberOrZero(plan.additionalCost ?? bomItem?.additionalCost ?? 0));
+    const additionalCostRaw = plan.additionalCost ?? bomItem?.additionalCost;
+    const additionalCost =
+      additionalCostRaw === undefined || additionalCostRaw === null || String(additionalCostRaw).trim() === ''
+        ? 1
+        : Math.max(0, toNumberOrZero(additionalCostRaw));
     const moq = Math.max(0, toNumberOrZero(plan.moq ?? bomItem?.moq ?? 0));
 
     const previousAssetIdOrSku = String(bomItem?.inventoryAssetId || bomItem?.inventorySku || '');
@@ -483,6 +523,33 @@ const SubmittedBom = () => {
     } catch (err) {
       updateRowPlan(rowKey, { saving: false });
       setError(err.response?.data?.message || (isInventoryManager ? 'Failed to save BOM row' : 'Failed to save planned inventory'));
+    }
+  };
+
+  const handleSetBomStatus = async (projectId, rowIndex, bomItem, status) => {
+    const rowKey = getRowKey(projectId, bomItem?._id || rowIndex);
+    updateRowPlan(rowKey, { statusSaving: true });
+    setError('');
+    setSuccess('');
+    try {
+      const res = await api.put(`/projects/${projectId}/bom/${bomItem._id}`, { inventoryStatus: status });
+      const updatedBomItem = res.data?.bomItem;
+      if (updatedBomItem) {
+        setProjects((prev) =>
+          prev.map((p) => {
+            if (p._id !== projectId) return p;
+            return {
+              ...p,
+              bomItems: (p.bomItems || []).map((bi) => (String(bi._id) === String(updatedBomItem._id) ? updatedBomItem : bi))
+            };
+          })
+        );
+      }
+      updateRowPlan(rowKey, { statusSaving: false });
+      setSuccess(`Inventory status set to ${status}`);
+    } catch (err) {
+      updateRowPlan(rowKey, { statusSaving: false });
+      setError(err.response?.data?.message || 'Failed to update inventory status');
     }
   };
 
@@ -757,8 +824,9 @@ const SubmittedBom = () => {
                                     const savedLinkAssetId = String(b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
                                     const savedLinkSku = String(b.inventorySku || plan.lastSaved?.inventorySku || '');
                                     const isAssigned = Boolean(savedLinkAssetId || savedLinkSku);
-                                    const statusLabel = isAssigned ? 'Assigned' : (b.inventoryStatus || '');
-                                    const statusMeta = getInventoryStatusMeta(statusLabel);
+                                    let statusLabel = b.inventoryStatus || '';
+                                    if (!statusLabel && isAssigned) statusLabel = 'Assigned';
+                                    const statusMeta = getInventoryStatusMeta(statusLabel, b);
                                     const statusSaving = Boolean(plan.statusSaving);
 
                                     return (
@@ -981,6 +1049,26 @@ const SubmittedBom = () => {
                                           <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
                                             {statusMeta.label}
                                           </span>
+                                          {isProjectManager && isAssigned && (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleSetBomStatus(p._id, i, b, 'Utilized')}
+                                                disabled={statusSaving}
+                                                className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-primary text-white hover:bg-primary-700 transition-all disabled:opacity-50"
+                                              >
+                                                Utilized
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleSetBomStatus(p._id, i, b, 'Non Utilized')}
+                                                disabled={statusSaving}
+                                                className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-gray-500 text-white hover:bg-gray-600 transition-all disabled:opacity-50"
+                                              >
+                                                Non Utilized
+                                              </button>
+                                            </div>
+                                          )}
                                           <button
                                             type="button"
                                             onClick={() => handleSetNeedToPurchase(p._id, i, b)}

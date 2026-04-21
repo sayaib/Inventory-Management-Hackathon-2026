@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Save, Trash2, User as UserIcon } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
+import { DEPARTMENTS } from '../constants/assets';
 
 const EMPTY_PROFILE = {
   firstName: '',
@@ -29,9 +30,23 @@ const AdminProfile = () => {
 
   const [username, setUsername] = useState('');
   const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [departments, setDepartments] = useState(DEPARTMENTS);
 
   const email = user?.email || '';
   const role = user?.role || '';
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setDepartments(list);
+      } catch {
+        setDepartments(DEPARTMENTS);
+      }
+    };
+    loadDepartments();
+  }, []);
 
   const canSubmit = useMemo(() => {
     if (!username?.trim()) return false;
@@ -171,12 +186,37 @@ const AdminProfile = () => {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Department</label>
-              <input
+              <select
                 name="department"
                 value={profile.department}
                 onChange={handleProfileChange}
                 className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-              />
+              >
+                <option value="">Unassigned</option>
+                {(() => {
+                  const list = Array.isArray(departments) ? departments : [];
+                  const unique = [];
+                  const seen = new Set();
+                  const current = String(profile.department || '').trim();
+                  if (current) {
+                    unique.push(current);
+                    seen.add(current.toLowerCase());
+                  }
+                  for (const d of list) {
+                    const value = String(d || '').trim();
+                    if (!value) continue;
+                    const key = value.toLowerCase();
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    unique.push(value);
+                  }
+                  return unique.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ));
+                })()}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600">Job Title</label>

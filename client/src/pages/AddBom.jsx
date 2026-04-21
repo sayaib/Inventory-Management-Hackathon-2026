@@ -156,8 +156,11 @@ const deriveRow = (row) => {
   const totalQtyWithSpare = Math.max(0, qtyPerBoard * boardReqWithSpare);
 
   const unitCost = Math.max(0, toNumberOrZero(row.unitCost));
-  const additionalCost = Math.max(0, toNumberOrZero(row.additionalCost));
-  const landingCostPerUnit = Math.max(0, unitCost + additionalCost);
+  const additionalCostRaw = row.additionalCost;
+  const additionalCost = additionalCostRaw === undefined || additionalCostRaw === null || String(additionalCostRaw).trim() === ''
+    ? 1
+    : Math.max(0, toNumberOrZero(additionalCostRaw));
+  const landingCostPerUnit = Math.max(0, unitCost * additionalCost);
   const totalPrice = Math.max(0, landingCostPerUnit * totalQtyWithSpare);
 
   return {
@@ -350,7 +353,7 @@ const AddBom = () => {
           boardReqWithSpare: derived.boardReqWithSpare,
           totalQtyWithSpare: derived.totalQtyWithSpare,
           unitCost: toNumberOrZero(r.unitCost),
-          additionalCost: toNumberOrZero(r.additionalCost),
+          additionalCost: String(r.additionalCost ?? '').trim() === '' ? 1 : toNumberOrZero(r.additionalCost),
           landingCostPerUnit: derived.landingCostPerUnit,
           totalPrice: derived.totalPrice,
           moq: toNumberOrZero(r.moq),
@@ -398,7 +401,7 @@ const AddBom = () => {
         boardReq: toNumberOrZero(row.boardReq),
         spareQty: toNumberOrZero(row.spareQty),
         unitCost: toNumberOrZero(row.unitCost),
-        additionalCost: toNumberOrZero(row.additionalCost),
+        additionalCost: String(row.additionalCost ?? '').trim() === '' ? 1 : toNumberOrZero(row.additionalCost),
         moq: toNumberOrZero(row.moq),
         remarks: row.remarks,
         leadTime: row.leadTime || row.leadTimeWeeks,

@@ -14,7 +14,7 @@ const canViewProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD,
 const canCreateProjects = roleMiddleware([ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 const canEditProjects = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 const canManageBom = roleMiddleware([ROLES.PRESALE, ROLES.ADMIN]);
-const canUpdateBom = roleMiddleware([ROLES.PRESALE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
+const canUpdateBom = roleMiddleware([ROLES.PRESALE, ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PROJECT_MANAGER]);
 const canCreateBomChangeRequest = roleMiddleware([ROLES.PROJECT_MANAGER, ROLES.ADMIN, ROLES.INVENTORY_MANAGER]);
 
 const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLowerCase();
@@ -318,7 +318,12 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
         bomItems: bomItems.map((it) => {
           const hasLink = Boolean(String(it?.inventoryAssetId || '').trim() || String(it?.inventorySku || '').trim());
           const incoming = String(it?.inventoryStatus || '').trim();
-          const currentStatus = hasLink ? 'Assigned' : (incoming || 'Pending');
+          let currentStatus = 'Pending';
+          if (hasLink) {
+            currentStatus = (incoming === 'Utilized' || incoming === 'Non Utilized') ? incoming : 'Assigned';
+          } else {
+            currentStatus = incoming || 'Pending';
+          }
           return {
             id: it?._id,
             srNo: Math.max(0, Number(it?.srNo || 0)),
@@ -732,8 +737,12 @@ const buildBomItem = (payload) => {
   const totalQtyWithSpare = Math.max(0, qtyPerBoard * boardReqWithSpare);
 
   const unitCost = Math.max(0, toNumberOrZero(payload.unitCost));
-  const additionalCost = Math.max(0, toNumberOrZero(payload.additionalCost));
-  const landingCostPerUnit = Math.max(0, unitCost + additionalCost);
+  const additionalCostRaw = payload.additionalCost;
+  const additionalCost =
+    additionalCostRaw === undefined || additionalCostRaw === null || String(additionalCostRaw).trim() === ''
+      ? 1
+      : Math.max(0, toNumberOrZero(additionalCostRaw));
+  const landingCostPerUnit = Math.max(0, unitCost * additionalCost);
   const totalPrice = Math.max(0, landingCostPerUnit * totalQtyWithSpare);
   const leadTimeWeeks = Math.max(0, toNumberOrZero(payload.leadTimeWeeks ?? payload.leadTime));
   const plannedQty = Math.max(0, toNumberOrZero(payload.plannedQty));
@@ -742,12 +751,18 @@ const buildBomItem = (payload) => {
   const inventorySku = typeof payload.inventorySku === 'string' ? payload.inventorySku.trim() : '';
   const inventoryItemName = typeof payload.inventoryItemName === 'string' ? payload.inventoryItemName.trim() : '';
 
-  const incomingStatusRaw = typeof payload.inventoryStatus === 'string' ? payload.inventoryStatus.trim() : '';
+  const incomingStatusRaw = String(payload.inventoryStatus || '').trim();
   const incomingStatus =
-    incomingStatusRaw === 'Pending' || incomingStatusRaw === 'Need to Purchase' || incomingStatusRaw === 'Assigned'
+    ['Pending', 'Need to Purchase', 'Assigned', 'Utilized', 'Non Utilized'].includes(incomingStatusRaw)
       ? incomingStatusRaw
       : '';
-  const inventoryStatus = inventoryAssetId || inventorySku ? 'Assigned' : (incomingStatus === 'Need to Purchase' ? 'Need to Purchase' : 'Pending');
+  
+  let inventoryStatus = 'Pending';
+  if (inventoryAssetId || inventorySku) {
+    inventoryStatus = (incomingStatus === 'Utilized' || incomingStatus === 'Non Utilized') ? incomingStatus : 'Assigned';
+  } else {
+    inventoryStatus = (incomingStatus === 'Need to Purchase') ? 'Need to Purchase' : 'Pending';
+  }
 
   return {
     typeOfComponent: typeof payload.typeOfComponent === 'string' ? payload.typeOfComponent.trim() : '',
@@ -919,8 +934,13 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
       'inventoryStatus'
     ]);
     const payload = {};
+    const isProjectManager = req.user?.role === ROLES.PROJECT_MANAGER;
     for (const [k, v] of Object.entries(rawPayload)) {
-      if (allowedKeys.has(k)) payload[k] = v;
+      if (isProjectManager) {
+        if (k === 'inventoryStatus') payload[k] = v;
+      } else if (allowedKeys.has(k)) {
+        payload[k] = v;
+      }
     }
     const current = bomItem.toObject ? bomItem.toObject() : { ...bomItem };
     const currentNormalized = buildBomItem(current);

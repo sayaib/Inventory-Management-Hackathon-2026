@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -6,10 +6,15 @@ import api from '../api/axios';
 import Barcode from 'react-barcode';
 import { 
   ArrowLeft,
+  BarChart3,
   Eye,
   ArrowUpCircle,
   ArrowDownCircle,
   ArrowUpDown,
+  FolderKanban,
+  History,
+  LayoutDashboard,
+  LogOut,
   Plus, 
   Search, 
   Package, 
@@ -23,6 +28,9 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
+  Settings,
+  User as UserIcon,
+  Users,
   X,
   ShieldAlert,
   Barcode as BarcodeIcon,
@@ -35,7 +43,7 @@ const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
 
 const AssetManagement = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +87,7 @@ const AssetManagement = () => {
   const [editId, setEditId] = useState(null);
   const [companyDirectory, setCompanyDirectory] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState(ASSET_CATEGORIES);
+  const [departmentOptions, setDepartmentOptions] = useState(DEPARTMENTS);
   const itemsPerPage = 6;
 
   // Sync low stock filter with URL param changes
@@ -183,16 +192,25 @@ const AssetManagement = () => {
       const categories = Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0
         ? res.data.assetCategories
         : ASSET_CATEGORIES;
+      const departments = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
       setCompanyDirectory(list);
       setCategoryOptions(categories);
+      setDepartmentOptions(departments);
       setFormData((prev) => {
-        if ((categories || []).includes(prev.category)) return prev;
-        return { ...prev, category: String(categories[0] || 'hardware') };
+        const next = { ...prev };
+        if (!(categories || []).includes(prev.category)) {
+          next.category = String(categories[0] || 'hardware');
+        }
+        if (!String(prev.department || '').trim()) {
+          next.department = String(departments[0] || '');
+        }
+        return next;
       });
     } catch (err) {
       console.error('Failed to fetch company directory', err);
       setCompanyDirectory([]);
       setCategoryOptions(ASSET_CATEGORIES);
+      setDepartmentOptions(DEPARTMENTS);
     }
   }, []);
 
@@ -423,13 +441,29 @@ const AssetManagement = () => {
     setCurrentPage(1);
   };
 
+  const adminNavItems = [
+    { key: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin' },
+    { key: 'inventory', label: 'Inventory', icon: Package, href: '/inventory?from=admin' },
+    { key: 'projectStatus', label: 'Project Status', icon: FolderKanban, href: '/admin' },
+    { key: 'prediction', label: 'Prediction', icon: BarChart3, href: '/admin' },
+    { key: 'reports', label: 'Reports', icon: BarChart3, href: '/admin' },
+    { key: 'audit', label: 'Audit Logs', icon: History, href: '/admin' },
+    { key: 'users', label: 'Users', icon: Users, href: '/admin' },
+    { key: 'settings', label: 'Company', icon: Settings, href: '/admin' },
+    { key: 'profile', label: 'Profile', icon: UserIcon, href: '/admin' }
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50/40 via-white to-muted-50/40">
-      <nav className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-3">
-              <Link to={backTo} aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
+    <div className={fromAdmin ? 'min-h-screen bg-slate-50 flex' : 'min-h-screen bg-gradient-to-b from-primary-50/40 via-white to-muted-50/40'}>
+      {fromAdmin && (
+        <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-60 bg-slate-950 text-slate-100 border-r border-white/10">
+          <div className="flex w-full flex-col py-4">
+            <div className="px-3 mb-4 flex items-center gap-3">
+              <Link
+                to="/admin"
+                aria-label="Go to admin home"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm"
+              >
                 <img
                   src={APP_LOGO_URL}
                   alt="Optimized Solutions Ltd"
@@ -438,20 +472,96 @@ const AssetManagement = () => {
                   decoding="async"
                 />
               </Link>
-              <span className="text-xl font-bold text-gray-900 tracking-tight">Inventory</span>
+              <div className="leading-tight">
+                <div className="text-sm font-extrabold text-white">Admin Portal</div>
+                <div className="text-xs text-slate-300">Inventory control</div>
+              </div>
             </div>
-            <Link
-              to={backTo}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary transition-all duration-200 font-medium text-sm"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              {fromAdmin ? 'Back to Admin' : 'Back'}
-            </Link>
-          </div>
-        </div>
-      </nav>
 
-      <main className="p-4 sm:p-6">
+            <nav className="flex-1 px-3 py-2">
+              <div className="space-y-1">
+                {adminNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = item.key === 'inventory';
+                  return (
+                    <Link
+                      key={item.key}
+                      to={item.href}
+                      className={[
+                        'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
+                        isActive ? 'bg-white/10 text-white shadow-sm' : 'text-slate-200 hover:bg-white/5 hover:text-white'
+                      ].join(' ')}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
+
+            <div className="px-3">
+              <button
+                type="button"
+                onClick={logout}
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-slate-100 transition hover:bg-white/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      <div className={fromAdmin ? 'min-w-0 flex-1 lg:ml-60' : 'w-full'}>
+        {fromAdmin ? (
+          <header className="sticky top-0 z-20 app-nav">
+            <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-extrabold text-slate-900">Inventory</h1>
+                <p className="truncate text-xs text-slate-500">Admin inventory operations</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/admin"
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Admin
+                </Link>
+              </div>
+            </div>
+          </header>
+        ) : (
+          <nav className="bg-white/80 backdrop-blur border-b border-gray-200 sticky top-0 z-20">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6">
+              <div className="flex justify-between h-16 items-center">
+                <div className="flex items-center gap-3">
+                  <Link to={backTo} aria-label="Go to dashboard home" className="p-2 bg-primary rounded-lg">
+                    <img
+                      src={APP_LOGO_URL}
+                      alt="Optimized Solutions Ltd"
+                      className="h-6 w-6 rounded bg-white object-contain"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </Link>
+                  <span className="text-xl font-bold text-gray-900 tracking-tight">Inventory</span>
+                </div>
+                <Link
+                  to={backTo}
+                  className="flex items-center gap-2 text-gray-500 hover:text-primary transition-all duration-200 font-medium text-sm"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Link>
+              </div>
+            </div>
+          </nav>
+        )}
+
+        <main className="p-4 sm:p-6">
         <div className="max-w-6xl mx-auto">
         <div className="mb-6 rounded-3xl border border-primary-100 bg-white/70 backdrop-blur p-5 sm:p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -561,7 +671,11 @@ const AssetManagement = () => {
                     className="flex-1 px-3 py-2 bg-white border border-primary-200 rounded-lg focus:ring-2 focus:ring-primary-100 outline-none transition-all text-sm font-bold text-primary-800 shadow-sm"
                   >
                     <option value="">-- Choose a Department --</option>
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {departmentOptions.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
                   </select>
                   {selectedDept && (
                     <div className="flex items-center text-primary font-bold text-xs">
@@ -850,7 +964,11 @@ const AssetManagement = () => {
                   onChange={(e) => { setFilterDept(e.target.value); setCurrentPage(1); }}
                 >
                   <option value="All">All Departments</option>
-                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  {departmentOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
@@ -1656,6 +1774,7 @@ const AssetManagement = () => {
         </div>
       )}
       </main>
+    </div>
     </div>
   );
 };

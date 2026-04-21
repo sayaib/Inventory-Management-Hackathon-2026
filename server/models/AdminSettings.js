@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { ASSET_CATEGORIES } = require('../constants/assets');
+const { ASSET_CATEGORIES, DEPARTMENTS } = require('../constants/assets');
 
 const companySchema = new mongoose.Schema(
   {
@@ -16,6 +16,7 @@ const adminSettingsSchema = new mongoose.Schema(
     defaultLowStockThreshold: { type: Number, default: 5, min: 0 },
     companyDirectory: { type: [companySchema], default: [] },
     assetCategories: { type: [String], default: ASSET_CATEGORIES },
+    departments: { type: [String], default: DEPARTMENTS },
     selectedCompanyId: { type: String, trim: true, default: '' },
     selectedCompanyLocation: { type: String, trim: true, default: '' }
   },

@@ -4,6 +4,7 @@ import { ClipboardList, ArrowLeft, Eye, Pencil, PlusCircle } from 'lucide-react'
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
+import { DEPARTMENTS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -20,6 +21,7 @@ const BomDashboard = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [settingsDepartments, setSettingsDepartments] = useState(DEPARTMENTS);
   const canEditBom = user?.role === ROLES.PRESALE;
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const userDept = normalizeDepartment(user?.profile?.department);
@@ -43,15 +45,33 @@ const BomDashboard = () => {
   }, [fetchProjects]);
 
   useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setSettingsDepartments(list);
+      } catch {
+        setSettingsDepartments(DEPARTMENTS);
+      }
+    };
+    loadDepartments();
+  }, []);
+
+  useEffect(() => {
     if (!lockDepartment) return;
     setDepartmentFilter(userDept);
   }, [lockDepartment, userDept]);
 
   const departments = useMemo(() => {
     const set = new Set();
+    for (const d of settingsDepartments || []) {
+      const next = typeof d === 'string' ? d.trim() : '';
+      if (next) set.add(next);
+    }
     for (const p of projects) set.add(normalizeDepartment(p.department));
+    set.add('Unassigned');
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [projects]);
+  }, [projects, settingsDepartments]);
 
   const grouped = useMemo(() => {
     const map = new Map();

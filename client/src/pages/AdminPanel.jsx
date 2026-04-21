@@ -7,7 +7,7 @@ import UserManagement from '../components/UserManagement';
 import AuditLog from '../components/AuditLog';
 import AdminProfile from '../components/AdminProfile';
 import api from '../api/axios';
-import { ASSET_CATEGORIES } from '../constants/assets';
+import { ASSET_CATEGORIES, DEPARTMENTS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -43,6 +43,8 @@ const AdminPanel = () => {
   const [projectStatusSearch, setProjectStatusSearch] = useState('');
   const [projectStatusDept, setProjectStatusDept] = useState('all');
   const [projectStatusExpanded, setProjectStatusExpanded] = useState({});
+  const [inventoryStatusProjectId, setInventoryStatusProjectId] = useState('');
+  const [inventoryStatusFilter, setInventoryStatusFilter] = useState('all');
   const [reportDept, setReportDept] = useState('all');
   const [reportSearch, setReportSearch] = useState('');
   const [lowStockRows, setLowStockRows] = useState([]);
@@ -96,6 +98,10 @@ const AdminPanel = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [selectedCategoryName, setSelectedCategoryName] = useState('');
   const [renameCategoryName, setRenameCategoryName] = useState('');
+  const [departments, setDepartments] = useState(DEPARTMENTS);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [selectedDepartmentName, setSelectedDepartmentName] = useState('');
+  const [renameDepartmentName, setRenameDepartmentName] = useState('');
   const [defaultLowStockThreshold, setDefaultLowStockThreshold] = useState(() => {
     const raw = localStorage.getItem('admin_default_low_stock_threshold');
     const n = Number(raw);
@@ -131,6 +137,31 @@ const AdminPanel = () => {
       }
     },
     [setAssetCategories]
+  );
+
+  const persistDepartments = useCallback(
+    async (nextDepartments, successMessage) => {
+      setCompanySettingsError('');
+      setCompanySettingsSuccess('');
+      setCompanySettingsSaving(true);
+      try {
+        const res = await api.put('/settings/admin', { departments: nextDepartments });
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setDepartments(list);
+        setSelectedDepartmentName((prev) => (prev && list.includes(prev) ? prev : String(list[0] || '')));
+        setRenameDepartmentName((prev) => {
+          const trimmed = String(prev || '').trim();
+          if (trimmed && list.includes(trimmed)) return trimmed;
+          return String(list[0] || '');
+        });
+        setCompanySettingsSuccess(successMessage);
+      } catch (err) {
+        setCompanySettingsError(err.response?.data?.message || err?.message || 'Failed to save departments');
+      } finally {
+        setCompanySettingsSaving(false);
+      }
+    },
+    [setDepartments]
   );
 
   useEffect(() => {
@@ -174,6 +205,7 @@ const AdminPanel = () => {
         const categories = Array.isArray(res.data?.assetCategories) && res.data.assetCategories.length > 0
           ? res.data.assetCategories
           : ASSET_CATEGORIES;
+        const depts = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
         const n = Number(res.data?.defaultLowStockThreshold);
         const selectedId = String(res.data?.selectedCompanyId || '');
         const selectedLocation = String(res.data?.selectedCompanyLocation || '');
@@ -181,6 +213,9 @@ const AdminPanel = () => {
         setAssetCategories(categories);
         setSelectedCategoryName((prev) => (prev && categories.includes(prev) ? prev : String(categories[0] || '')));
         setRenameCategoryName((prev) => (prev ? prev : String(categories[0] || '')));
+        setDepartments(depts);
+        setSelectedDepartmentName((prev) => (prev && depts.includes(prev) ? prev : String(depts[0] || '')));
+        setRenameDepartmentName((prev) => (prev ? prev : String(depts[0] || '')));
         setSelectedCompanyId(selectedId);
         setSelectedCompanyLocation(selectedLocation);
         setDefaultLowStockThreshold(Number.isFinite(n) && n >= 0 ? n : 5);
@@ -207,6 +242,7 @@ const AdminPanel = () => {
             }
           })();
           const fallbackCategories = ASSET_CATEGORIES;
+          const fallbackDepartments = DEPARTMENTS;
           const fallbackSelectedCompanyId = (() => {
             try {
               return String(localStorage.getItem('admin_selected_company_id') || '');
@@ -224,6 +260,7 @@ const AdminPanel = () => {
           await api.put('/settings/admin', {
             companyDirectory: fallbackDirectory,
             assetCategories: fallbackCategories,
+            departments: fallbackDepartments,
             defaultLowStockThreshold: fallbackThreshold,
             selectedCompanyId: fallbackSelectedCompanyId,
             selectedCompanyLocation: fallbackSelectedCompanyLocation
@@ -232,6 +269,9 @@ const AdminPanel = () => {
           setAssetCategories(fallbackCategories);
           setSelectedCategoryName(String(fallbackCategories?.[0] || ''));
           setRenameCategoryName(String(fallbackCategories?.[0] || ''));
+          setDepartments(fallbackDepartments);
+          setSelectedDepartmentName(String(fallbackDepartments?.[0] || ''));
+          setRenameDepartmentName(String(fallbackDepartments?.[0] || ''));
           setSelectedCompanyId(fallbackSelectedCompanyId);
           setSelectedCompanyLocation(fallbackSelectedCompanyLocation);
           setDefaultLowStockThreshold(fallbackThreshold);
@@ -248,6 +288,13 @@ const AdminPanel = () => {
       setSelectedCategoryName(assetCategories[0]);
     }
   }, [assetCategories, selectedCategoryName]);
+
+  useEffect(() => {
+    if (!selectedDepartmentName && departments.length > 0) {
+      setSelectedDepartmentName(departments[0]);
+      setRenameDepartmentName(departments[0]);
+    }
+  }, [departments, selectedDepartmentName]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -506,9 +553,17 @@ const AdminPanel = () => {
   };
 
   useEffect(() => {
-    if (activeTab !== 'projectStatus' && activeTab !== 'reports') return;
+    if (activeTab !== 'overview' && activeTab !== 'projectStatus' && activeTab !== 'reports') return;
     fetchProjectStatuses();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (inventoryStatusProjectId) return;
+    if (!Array.isArray(projectStatusRows) || projectStatusRows.length === 0) return;
+    const firstId = String(projectStatusRows[0]?.id || projectStatusRows[0]?._id || '');
+    if (!firstId) return;
+    setInventoryStatusProjectId(firstId);
+  }, [inventoryStatusProjectId, projectStatusRows]);
 
   useEffect(() => {
     if (activeTab !== 'prediction') return;
@@ -621,11 +676,11 @@ const AdminPanel = () => {
     { key: 'inventory', label: 'Inventory', icon: Package, href: '/inventory?from=admin' },
     { key: 'projectStatus', label: 'Project Status', icon: FolderKanban },
     { key: 'prediction', label: 'Prediction', icon: BarChart3 },
-    { key: 'users', label: 'Users', icon: Users },
-    { key: 'profile', label: 'Profile', icon: UserIcon },
-    { key: 'audit', label: 'Audit Logs', icon: History },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
-    { key: 'settings', label: 'Company', icon: Settings }
+    { key: 'audit', label: 'Audit Logs', icon: History },
+    { key: 'users', label: 'Users', icon: Users },
+    { key: 'settings', label: 'Settings', icon: Settings },
+    { key: 'profile', label: 'Profile', icon: UserIcon }
   ];
 
   const deptQtyMap = (() => {
@@ -1287,14 +1342,153 @@ const AdminPanel = () => {
                   <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-extrabold text-slate-900">Current inventory status</div>
-                      <div className="text-xs text-slate-500">Awaiting live inventory allocation and procurement data.</div>
+                      <div className="text-xs text-slate-500">Project-wise inventory allocation and utilization snapshot.</div>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-500">No live items</div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={inventoryStatusProjectId}
+                        onChange={(e) => setInventoryStatusProjectId(e.target.value)}
+                        className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-extrabold text-slate-700"
+                      >
+                        {projectStatusRows
+                          .slice()
+                          .sort((a, b) => String(a?.code || '').localeCompare(String(b?.code || '')))
+                          .map((p) => {
+                            const id = String(p?.id || p?._id || '');
+                            if (!id) return null;
+                            const label = `${p?.code || id}${p?.name ? ` — ${p.name}` : ''}`;
+                            return (
+                              <option key={id} value={id}>
+                                {label}
+                              </option>
+                            );
+                          })}
+                      </select>
+                      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                        {[
+                          { key: 'all', label: 'All linked' },
+                          { key: 'assigned', label: 'Assigned' },
+                          { key: 'utilized', label: 'Utilized' }
+                        ].map((t) => {
+                          const isActive = inventoryStatusFilter === t.key;
+                          return (
+                            <button
+                              key={t.key}
+                              type="button"
+                              onClick={() => setInventoryStatusFilter(t.key)}
+                              className={[
+                                'h-6 rounded-md px-2 text-[11px] font-extrabold',
+                                isActive ? 'bg-primary text-white' : 'text-slate-700 hover:bg-slate-100'
+                              ].join(' ')}
+                            >
+                              {t.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-500">
+                        {(() => {
+                          const p = projectStatusRows.find((x) => String(x?.id || x?._id || '') === String(inventoryStatusProjectId || ''));
+                          const bomItems = Array.isArray(p?.bomItems) ? p.bomItems : [];
+                          const linked = bomItems.filter((it) => Boolean(String(it?.inventoryAssetId || '').trim() || String(it?.inventorySku || '').trim()));
+                          const utilized = linked.filter((it) => String(it?.inventoryStatus || it?.currentStatus || '').trim() === 'Utilized');
+                          const assigned = linked.filter((it) => String(it?.inventoryStatus || it?.currentStatus || '').trim() !== 'Utilized');
+                          const count =
+                            inventoryStatusFilter === 'utilized'
+                              ? utilized.length
+                              : inventoryStatusFilter === 'assigned'
+                                ? assigned.length
+                                : linked.length;
+                          return count > 0 ? `${count} items` : 'No items';
+                        })()}
+                      </div>
+                    </div>
                   </div>
                   <div className="w-full overflow-auto">
-                    <div className="px-4 py-8 text-sm text-slate-500">
-                      This section no longer displays fabricated inventory records. Live allocation and procurement data will appear here once connected.
-                    </div>
+                    {(() => {
+                      const selected = projectStatusRows.find((p) => String(p?.id || p?._id || '') === String(inventoryStatusProjectId || '')) || null;
+                      const bomItems = Array.isArray(selected?.bomItems) ? selected.bomItems : [];
+                      const linked = bomItems.filter((it) => Boolean(String(it?.inventoryAssetId || '').trim() || String(it?.inventorySku || '').trim()));
+                      const utilized = linked.filter((it) => String(it?.inventoryStatus || it?.currentStatus || '').trim() === 'Utilized');
+                      const assigned = linked.filter((it) => String(it?.inventoryStatus || it?.currentStatus || '').trim() !== 'Utilized');
+                      const items =
+                        inventoryStatusFilter === 'utilized'
+                          ? utilized
+                          : inventoryStatusFilter === 'assigned'
+                            ? assigned
+                            : linked;
+
+                      const statusBadge = (incoming) => {
+                        const status = String(incoming || '').trim();
+                        const meta =
+                          status === 'Utilized'
+                            ? { label: 'Utilized', className: 'bg-primary-50 text-primary-700 border-primary-200' }
+                            : status === 'Non Utilized'
+                              ? { label: 'Non Utilized', className: 'bg-gray-50 text-gray-700 border-gray-200' }
+                              : status === 'Need to Purchase'
+                                ? { label: 'Need to Purchase', className: 'bg-accent-50 text-accent-700 border-accent-100' }
+                                : status === 'Pending'
+                                  ? { label: 'Pending', className: 'bg-amber-50 text-amber-700 border-amber-200' }
+                                  : { label: status || 'Assigned', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                        return (
+                          <span className={['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider border', meta.className].join(' ')}>
+                            {meta.label}
+                          </span>
+                        );
+                      };
+
+                      if (projectStatusLoading && projectStatusRows.length === 0) {
+                        return <div className="px-4 py-6 text-sm text-slate-500">Loading…</div>;
+                      }
+
+                      if (!selected) {
+                        return <div className="px-4 py-6 text-sm text-slate-500">Select a project to view inventory.</div>;
+                      }
+
+                      if (items.length === 0) {
+                        return <div className="px-4 py-6 text-sm text-slate-500">No utilized/assigned inventory linked to BOM for this project.</div>;
+                      }
+
+                      return (
+                        <table className="min-w-[1100px] w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr className="text-[11px] font-extrabold text-slate-700">
+                              <th className="px-4 py-3">Sr No</th>
+                              <th className="px-4 py-3">Nomenclature</th>
+                              <th className="px-4 py-3">Part No / Drg</th>
+                              <th className="px-4 py-3">Make</th>
+                              <th className="px-4 py-3">Planned Qty</th>
+                              <th className="px-4 py-3">Inventory</th>
+                              <th className="px-4 py-3">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {items
+                              .slice()
+                              .sort((a, b) => Number(a?.srNo || 0) - Number(b?.srNo || 0))
+                              .map((it, idx) => (
+                                <tr key={`${String(it?.id || it?._id || it?.srNo || '')}-${idx}`} className="hover:bg-slate-50/70">
+                                  <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{Number(it?.srNo || 0)}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="font-bold text-slate-900">{it?.nomenclatureDescription || '-'}</div>
+                                    <div className="text-[11px] font-semibold text-slate-500">{it?.typeOfComponent || ''}</div>
+                                  </td>
+                                  <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{it?.partNoDrg || '-'}</td>
+                                  <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{it?.make || '-'}</td>
+                                  <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{Number(it?.plannedQty || 0)}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="text-[11px] font-semibold text-slate-700">
+                                      {it?.inventoryAssetId || it?.inventorySku || '-'}
+                                    </div>
+                                    <div className="text-[11px] font-semibold text-slate-500">{it?.inventoryItemName || ''}</div>
+                                  </td>
+                                  <td className="px-4 py-3">{statusBadge(it?.inventoryStatus || it?.currentStatus || 'Assigned')}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1409,6 +1603,7 @@ const AdminPanel = () => {
                                 const utilPct = Number(util?.percent || 0);
                                 const projectId = String(p?.id || p?._id || p?.code || '');
                                 const items = Array.isArray(p?.bomItems) ? p.bomItems : [];
+                                const utilizedBomCount = items.reduce((acc, it) => acc + (String(it?.inventoryStatus || it?.currentStatus || '').trim() === 'Utilized' ? 1 : 0), 0);
                                 const isExpanded = Boolean(projectStatusExpanded?.[projectId]);
                                 const bomStatusBadge = (status) => (
                                   <span
@@ -1449,6 +1644,9 @@ const AdminPanel = () => {
                                           </div>
                                           <div className="text-[11px] font-semibold text-slate-600">
                                             {utilDen > 0 ? `${utilUsed} / ${utilDen}` : 'No planned/allocated qty'}
+                                          </div>
+                                          <div className="text-[11px] font-semibold text-slate-500">
+                                            {items.length > 0 ? `Utilized BOM: ${utilizedBomCount} / ${items.length}` : 'Utilized BOM: —'}
                                           </div>
                                           <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(util?.at)}</div>
                                         </div>
@@ -2883,6 +3081,116 @@ const AdminPanel = () => {
                           }}
                           className="h-9 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-extrabold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
                           disabled={bulkApplying || companySettingsSaving || !selectedCategoryName}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Departments</h2>
+                      <p className="text-xs text-slate-500">Manage department dropdown options used across the app.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">Add department</div>
+                      <div className="flex gap-2">
+                        <input
+                          value={newDepartmentName}
+                          onChange={(e) => setNewDepartmentName(e.target.value)}
+                          placeholder="New department name"
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        />
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const next = String(newDepartmentName || '').trim();
+                            if (!next) return;
+                            const list = Array.isArray(departments) ? departments : [];
+                            const exists = list.some((d) => String(d || '').trim().toLowerCase() === next.toLowerCase());
+                            if (exists) return;
+                            const nextList = [...list, next];
+                            setNewDepartmentName('');
+                            await persistDepartments(nextList, 'Department added and saved');
+                          }}
+                          className="h-9 rounded-lg bg-primary px-3 text-xs font-extrabold text-white hover:bg-primary-700 disabled:opacity-50"
+                          disabled={bulkApplying || companySettingsSaving}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <div className="text-xs font-extrabold text-slate-700">Update/Delete</div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <select
+                          value={selectedDepartmentName}
+                          onChange={(e) => {
+                            setSelectedDepartmentName(e.target.value);
+                            setRenameDepartmentName(e.target.value);
+                          }}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        >
+                          {(departments || []).length === 0 ? (
+                            <option value="">No departments</option>
+                          ) : (
+                            (departments || []).map((d) => (
+                              <option key={d} value={d}>
+                                {d}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                        <input
+                          value={renameDepartmentName}
+                          onChange={(e) => setRenameDepartmentName(e.target.value)}
+                          placeholder="Rename selected department"
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                          disabled={bulkApplying || companySettingsSaving}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const current = String(selectedDepartmentName || '').trim();
+                            const next = String(renameDepartmentName || '').trim();
+                            if (!current || !next) return;
+                            const list = Array.isArray(departments) ? departments : [];
+                            const duplicate = list.some((d) => {
+                              const key = String(d || '').trim().toLowerCase();
+                              return key === next.toLowerCase() && key !== current.toLowerCase();
+                            });
+                            if (duplicate) return;
+                            const nextList = list.map((d) => (String(d) === current ? next : d));
+                            await persistDepartments(nextList, 'Department updated and saved');
+                          }}
+                          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                          disabled={bulkApplying || companySettingsSaving || !selectedDepartmentName}
+                        >
+                          Update
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const current = String(selectedDepartmentName || '').trim();
+                            if (!current) return;
+                            const list = Array.isArray(departments) ? departments : [];
+                            const nextList = list.filter((d) => String(d) !== current);
+                            const finalList = nextList.length > 0 ? nextList : DEPARTMENTS;
+                            await persistDepartments(finalList, 'Department deleted and saved');
+                          }}
+                          className="h-9 rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-extrabold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                          disabled={bulkApplying || companySettingsSaving || !selectedDepartmentName}
                         >
                           Delete
                         </button>

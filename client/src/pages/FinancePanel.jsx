@@ -16,8 +16,8 @@ const formatCurrency = (value) => {
 const FinancePanel = () => {
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('valuation');
-
-  const departmentOptions = useMemo(() => ['All', ...DEPARTMENTS], []);
+  const [departments, setDepartments] = useState(DEPARTMENTS);
+  const departmentOptions = useMemo(() => ['All', ...departments], [departments]);
 
   const [valuationDepartment, setValuationDepartment] = useState('All');
   const [valuationSearch, setValuationSearch] = useState('');
@@ -43,6 +43,19 @@ const FinancePanel = () => {
   const [wastageByReason, setWastageByReason] = useState([]);
   const [wastageTopItems, setWastageTopItems] = useState([]);
   const [wastageTrend, setWastageTrend] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setDepartments(list);
+      } catch {
+        setDepartments(DEPARTMENTS);
+      }
+    };
+    load();
+  }, []);
 
   const fetchValuation = useCallback(async () => {
     setValuationLoading(true);

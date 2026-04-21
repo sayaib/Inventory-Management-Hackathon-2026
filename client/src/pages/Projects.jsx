@@ -4,6 +4,7 @@ import { ArrowLeft, Briefcase, ChevronDown, ChevronUp, ClipboardList, Eye, Penci
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
+import { DEPARTMENTS } from '../constants/assets';
 
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
@@ -19,6 +20,27 @@ const formatMoney = (value) => {
   return parsed.toFixed(2);
 };
 
+const toNumberOrZero = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const computeLandingCostPerUnit = (bomItem) => {
+  const unitCost = Math.max(0, toNumberOrZero(bomItem?.unitCost));
+  const additionalCostRaw = bomItem?.additionalCost;
+  const additionalCost =
+    additionalCostRaw === undefined || additionalCostRaw === null || String(additionalCostRaw).trim() === ''
+      ? 1
+      : Math.max(0, toNumberOrZero(additionalCostRaw));
+  return Math.max(0, unitCost * additionalCost);
+};
+
+const computeTotalPrice = (bomItem) => {
+  const landingCostPerUnit = computeLandingCostPerUnit(bomItem);
+  const totalQtyWithSpare = Math.max(0, toNumberOrZero(bomItem?.totalQtyWithSpare));
+  return Math.max(0, landingCostPerUnit * totalQtyWithSpare);
+};
+
 const isInventoryManagerEdited = (bomItem, field) => {
   const list = bomItem?.inventoryManagerEditedFields;
   return Array.isArray(list) && list.includes(field);
@@ -30,8 +52,20 @@ const cellClass = (bomItem, field) => (
 
 const getInventoryStatusMeta = (bomItem) => {
   const hasLink = Boolean(bomItem?.inventoryAssetId || bomItem?.inventorySku);
-  const incoming = hasLink ? 'Assigned' : String(bomItem?.inventoryStatus || '').trim();
-  const status = incoming || 'Pending';
+  const incoming = String(bomItem?.inventoryStatus || '').trim();
+  const status = incoming || (hasLink ? 'Assigned' : 'Pending');
+  if (status === 'Utilized') {
+    return {
+      label: 'Utilized',
+      className: 'bg-primary-50 text-primary-700 border-primary-200'
+    };
+  }
+  if (status === 'Non Utilized') {
+    return {
+      label: 'Non Utilized',
+      className: 'bg-gray-50 text-gray-700 border-gray-200'
+    };
+  }
   if (status === 'Assigned') {
     return {
       label: 'Assigned',
@@ -83,6 +117,7 @@ const Projects = () => {
   const [bomQuery, setBomQuery] = useState('');
   const [materialsQuery, setMaterialsQuery] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
+  const [settingsDepartments, setSettingsDepartments] = useState(DEPARTMENTS);
 
   const [createForm, setCreateForm] = useState({ iwoNo: '', name: '', description: '', department: '' });
 
@@ -107,6 +142,19 @@ const Projects = () => {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) && res.data.departments.length > 0 ? res.data.departments : DEPARTMENTS;
+        setSettingsDepartments(list);
+      } catch {
+        setSettingsDepartments(DEPARTMENTS);
+      }
+    };
+    loadDepartments();
+  }, []);
 
   const fetchProjectSummary = useCallback(async () => {
     if (!selectedProjectId) return;
@@ -166,9 +214,14 @@ const Projects = () => {
 
   const departments = useMemo(() => {
     const set = new Set();
+    for (const d of settingsDepartments || []) {
+      const next = typeof d === 'string' ? d.trim() : '';
+      if (next) set.add(next);
+    }
     for (const p of projects) set.add(normalizeDepartment(p.department));
+    set.add('Unassigned');
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [projects]);
+  }, [projects, settingsDepartments]);
 
   const statuses = useMemo(() => {
     const set = new Set();
@@ -312,6 +365,17 @@ const Projects = () => {
       setUtilizeLoading((prev) => ({ ...prev, [key]: false }));
     }
   }, [buildRowKey, fetchProjectSummary, fetchProjects, selectedProject, summaryByAssetId]);
+
+  const handleUpdateBomStatus = useCallback(async (bomItemId, status) => {
+    if (!selectedProject) return;
+    try {
+      await api.put(`/projects/${selectedProject._id}/bom/${bomItemId}`, { inventoryStatus: status });
+      setSuccess(`Inventory status updated to ${status}`);
+      await fetchProjects();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update status');
+    }
+  }, [selectedProject, fetchProjects]);
 
   const filteredBom = useMemo(() => {
     const q = bomQuery.trim().toLowerCase();
@@ -827,8 +891,8 @@ const Projects = () => {
                                   <td className={cellClass(b, 'totalQtyWithSpare')}>{b.totalQtyWithSpare ?? 0}</td>
                                   <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
                                   <td className={cellClass(b, 'additionalCost')}>{formatMoney(b.additionalCost)}</td>
-                                  <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
-                                  <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                                  <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(computeLandingCostPerUnit(b))}</td>
+                                  <td className={cellClass(b, 'totalPrice')}>{formatMoney(computeTotalPrice(b))}</td>
                                   <td className={cellClass(b, 'moq')}>{b.moq ?? 0}</td>
                                   <td className={cellClass(b, 'leadTime')}>{b.leadTime || '-'}</td>
                                   <td className={cellClass(b, 'leadTimeWeeks')}>{b.leadTimeWeeks ?? 0}</td>
@@ -837,9 +901,29 @@ const Projects = () => {
                                   <td className={cellClass(b, 'inventoryItemName')}>{b.inventoryItemName || '-'}</td>
                                   <td className={cellClass(b, 'plannedQty')}>{b.plannedQty ?? 0}</td>
                                   <td className={cellClass(b, 'inventoryStatus')}>
-                                    <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
-                                      {statusMeta.label}
-                                    </span>
+                                    <div className="flex flex-col items-start gap-1">
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                                        {statusMeta.label}
+                                      </span>
+                                      {isProjectManager && (b.inventoryAssetId || b.inventorySku) && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateBomStatus(b._id, 'Utilized')}
+                                            className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-primary text-white hover:bg-primary-700 transition-all"
+                                          >
+                                            Utilized
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateBomStatus(b._id, 'Non Utilized')}
+                                            className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-gray-500 text-white hover:bg-gray-600 transition-all"
+                                          >
+                                            Non Utilized
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                                 </tr>
@@ -872,12 +956,32 @@ const Projects = () => {
                                   <td className={cellClass(b, 'nomenclatureDescription')}>{b.nomenclatureDescription}</td>
                                   <td className={cellClass(b, 'totalQtyWithSpare')}>{b.totalQtyWithSpare}</td>
                                   <td className={cellClass(b, 'unitCost')}>{formatMoney(b.unitCost)}</td>
-                                  <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(b.landingCostPerUnit)}</td>
-                                  <td className={cellClass(b, 'totalPrice')}>{formatMoney(b.totalPrice)}</td>
+                                  <td className={cellClass(b, 'landingCostPerUnit')}>{formatMoney(computeLandingCostPerUnit(b))}</td>
+                                  <td className={cellClass(b, 'totalPrice')}>{formatMoney(computeTotalPrice(b))}</td>
                                   <td className={cellClass(b, 'inventoryStatus')}>
-                                    <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
-                                      {statusMeta.label}
-                                    </span>
+                                    <div className="flex flex-col items-start gap-1">
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                                        {statusMeta.label}
+                                      </span>
+                                      {isProjectManager && (b.inventoryAssetId || b.inventorySku) && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateBomStatus(b._id, 'Utilized')}
+                                            className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-primary text-white hover:bg-primary-700 transition-all"
+                                          >
+                                            Utilized
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateBomStatus(b._id, 'Non Utilized')}
+                                            className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-gray-500 text-white hover:bg-gray-600 transition-all"
+                                          >
+                                            Non Utilized
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className={cellClass(b, 'remarks')}>{b.remarks || '-'}</td>
                                 </tr>

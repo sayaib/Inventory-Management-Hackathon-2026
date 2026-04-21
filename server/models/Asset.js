@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { ASSET_CATEGORIES, ASSET_STATUSES, DEPARTMENTS } = require('../constants/assets');
+const { ASSET_CATEGORIES, ASSET_STATUSES } = require('../constants/assets');
 
 const assetSchema = new mongoose.Schema({
   // Basic Fields
@@ -27,7 +27,6 @@ const assetSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-    enum: DEPARTMENTS,
     required: true
   },
   subDepartment: {

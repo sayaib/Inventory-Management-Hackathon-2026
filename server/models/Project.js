@@ -46,7 +46,7 @@ const bomItemSchema = new mongoose.Schema({
   inventorySku: { type: String, default: '', trim: true },
   inventoryItemName: { type: String, default: '', trim: true },
   plannedQty: { type: Number, default: 0, min: 0 },
-  inventoryStatus: { type: String, enum: ['Pending', 'Need to Purchase', 'Assigned'], default: 'Pending', trim: true },
+  inventoryStatus: { type: String, enum: ['Pending', 'Need to Purchase', 'Assigned', 'Utilized', 'Non Utilized'], default: 'Pending', trim: true },
   inventoryManagerEditedFields: { type: [String], default: [] },
   inventoryManagerEditedAt: { type: Date, default: null },
   inventoryManagerEditedBy: { type: String, default: '', trim: true }
