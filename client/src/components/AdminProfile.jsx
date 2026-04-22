@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Save, Trash2, User as UserIcon } from 'lucide-react';
+import { Save, Trash2, User as UserIcon } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { DEPARTMENTS } from '../constants/assets';
+import Alert from './ui/Alert';
+import Spinner from './ui/Spinner';
 
 const EMPTY_PROFILE = {
   firstName: '',
@@ -16,8 +18,8 @@ const EMPTY_PROFILE = {
   state: '',
   postalCode: '',
   country: '',
-  avatarUrl: '',
-  bio: ''
+  bio: '',
+  avatarUpdatedAt: null
 };
 
 const AdminProfile = () => {
@@ -25,12 +27,14 @@ const AdminProfile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const [username, setUsername] = useState('');
   const [profile, setProfile] = useState(EMPTY_PROFILE);
   const [departments, setDepartments] = useState(DEPARTMENTS);
+  const [userId, setUserId] = useState('');
 
   const email = user?.email || '';
   const role = user?.role || '';
@@ -58,16 +62,18 @@ const AdminProfile = () => {
     setError('');
     try {
       const res = await api.get('/auth/profile');
+      setUserId(res.data?.id || user?._id || user?.id || '');
       setUsername(res.data?.username || user?.username || '');
       setProfile({ ...EMPTY_PROFILE, ...(res.data?.profile || {}) });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load profile');
+      setUserId(user?._id || user?.id || '');
       setUsername(user?.username || '');
       setProfile(EMPTY_PROFILE);
     } finally {
       setLoading(false);
     }
-  }, [user?.username]);
+  }, [user?._id, user?.id, user?.username]);
 
   useEffect(() => {
     loadProfile();
@@ -84,7 +90,9 @@ const AdminProfile = () => {
     setError('');
     setSuccess('');
     try {
-      const payload = { username: username.trim(), ...profile };
+      const profileFields = { ...(profile || {}) };
+      delete profileFields.avatarUpdatedAt;
+      const payload = { username: username.trim(), ...profileFields };
       await api.put('/auth/profile', payload);
       await refreshUser();
       setSuccess('Profile updated successfully');
@@ -92,6 +100,81 @@ const AdminProfile = () => {
       setError(err.response?.data?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const buildAvatarUrl = useMemo(() => {
+    if (!userId) return '';
+    const updatedAt = profile?.avatarUpdatedAt ? new Date(profile.avatarUpdatedAt).getTime() : 0;
+    const base = `${api.defaults.baseURL}/auth/users/${userId}/avatar`;
+    return updatedAt ? `${base}?v=${updatedAt}` : base;
+  }, [profile?.avatarUpdatedAt, userId]);
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setAvatarUploading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 256;
+            const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
+            const targetW = Math.max(1, Math.round((img.width || 1) * scale));
+            const targetH = Math.max(1, Math.round((img.height || 1) * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas not supported');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, targetW, targetH);
+            ctx.drawImage(img, 0, 0, targetW, targetH);
+            const out = canvas.toDataURL('image/jpeg', 0.82);
+            URL.revokeObjectURL(objectUrl);
+            resolve(out);
+          } catch (canvasErr) {
+            URL.revokeObjectURL(objectUrl);
+            reject(canvasErr);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Invalid image'));
+        };
+        img.src = objectUrl;
+      });
+
+      const res = await api.put('/auth/profile/avatar', { imageDataUrl: dataUrl });
+      setProfile((prev) => ({ ...(prev || {}), avatarUpdatedAt: res.data?.avatarUpdatedAt || new Date().toISOString() }));
+      await refreshUser();
+      setSuccess('Profile image updated');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload profile image');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setAvatarUploading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await api.delete('/auth/profile/avatar');
+      setProfile((prev) => ({ ...(prev || {}), avatarUpdatedAt: null }));
+      await refreshUser();
+      setSuccess('Profile image removed');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove profile image');
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -114,7 +197,7 @@ const AdminProfile = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <Spinner className="h-6 w-6 text-primary" />
       </div>
     );
   }
@@ -144,7 +227,7 @@ const AdminProfile = () => {
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
                 placeholder="Username"
                 required
               />
@@ -153,9 +236,51 @@ const AdminProfile = () => {
               <label className="block text-xs font-bold text-slate-600">Email (read-only)</label>
               <input
                 value={email}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 outline-none"
+                className="mt-1 app-input bg-slate-50 text-slate-500"
                 readOnly
               />
+            </div>
+            <div className="sm:col-span-2 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 overflow-hidden rounded-full bg-slate-200">
+                  {buildAvatarUrl ? (
+                    <img
+                      src={buildAvatarUrl}
+                      alt="Profile"
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900">Profile image</p>
+                  <p className="text-xs text-slate-500">Upload a small image (auto-compressed).</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="app-btn app-btn-secondary cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    disabled={avatarUploading}
+                    className="hidden"
+                  />
+                  {avatarUploading ? 'Uploading...' : 'Upload'}
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAvatarRemove}
+                  disabled={avatarUploading || !profile?.avatarUpdatedAt}
+                  className="app-btn app-btn-secondary text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50 disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600">First Name</label>
@@ -163,7 +288,7 @@ const AdminProfile = () => {
                 name="firstName"
                 value={profile.firstName}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -172,7 +297,7 @@ const AdminProfile = () => {
                 name="lastName"
                 value={profile.lastName}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -181,7 +306,7 @@ const AdminProfile = () => {
                 name="phone"
                 value={profile.phone}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -190,7 +315,7 @@ const AdminProfile = () => {
                 name="department"
                 value={profile.department}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-select"
               >
                 <option value="">Unassigned</option>
                 {(() => {
@@ -224,17 +349,7 @@ const AdminProfile = () => {
                 name="jobTitle"
                 value={profile.jobTitle}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600">Avatar URL</label>
-              <input
-                name="avatarUrl"
-                value={profile.avatarUrl}
-                onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
-                placeholder="https://..."
+                className="mt-1 app-input"
               />
             </div>
           </div>
@@ -246,7 +361,7 @@ const AdminProfile = () => {
                 name="addressLine1"
                 value={profile.addressLine1}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div className="sm:col-span-2">
@@ -255,7 +370,7 @@ const AdminProfile = () => {
                 name="addressLine2"
                 value={profile.addressLine2}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -264,7 +379,7 @@ const AdminProfile = () => {
                 name="city"
                 value={profile.city}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -273,7 +388,7 @@ const AdminProfile = () => {
                 name="state"
                 value={profile.state}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -282,7 +397,7 @@ const AdminProfile = () => {
                 name="postalCode"
                 value={profile.postalCode}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div>
@@ -291,7 +406,7 @@ const AdminProfile = () => {
                 name="country"
                 value={profile.country}
                 onChange={handleProfileChange}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-input"
               />
             </div>
             <div className="sm:col-span-2">
@@ -301,32 +416,32 @@ const AdminProfile = () => {
                 value={profile.bio}
                 onChange={handleProfileChange}
                 rows={4}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+                className="mt-1 app-textarea"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="text-sm">
-              {error && <p className="font-medium text-rose-700">{error}</p>}
-              {success && <p className="font-medium text-primary-700">{success}</p>}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 text-sm">
+              {error && <Alert variant="error">{error}</Alert>}
+              {!error && success && <Alert variant="success">{success}</Alert>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={handleClear}
                 disabled={clearing}
-                className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                className="app-btn app-btn-secondary text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50"
               >
-                {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {clearing ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                 Clear
               </button>
               <button
                 type="submit"
                 disabled={saving || !canSubmit}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50"
+                className="app-btn app-btn-primary px-5 py-2"
               >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {saving ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                 Save
               </button>
             </div>

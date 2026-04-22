@@ -13,6 +13,31 @@ const router = express.Router();
 
 const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLowerCase();
 
+const ALL_DEPARTMENTS_LABEL = 'All Departments';
+
+const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const isAllDepartments = (value) => normalizeDepartmentForCompare(value) === normalizeDepartmentForCompare(ALL_DEPARTMENTS_LABEL);
+
+const attachUserProfileDepartment = async (req, res, next) => {
+  if (!req.user) return next();
+  if (req.user.profileDepartment !== undefined) return next();
+  try {
+    const userDoc = await User.findById(req.user.id).select('profile.department');
+    req.user.profileDepartment = userDoc?.profile?.department || '';
+  } catch (error) {
+    req.user.profileDepartment = '';
+  }
+  next();
+};
+
+const getScopedDepartment = (req) => {
+  const raw = String(req.user?.profileDepartment || '').trim();
+  if (!raw) return '';
+  if (isAllDepartments(raw)) return '';
+  return raw;
+};
+
 const normalizeTrimmedStringOrEmpty = (value) => {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -73,7 +98,7 @@ const buildAssetWritePayload = (raw) => {
   return payload;
 };
 
-router.get('/logs/trend', authMiddleware, async (req, res) => {
+router.get('/logs/trend', authMiddleware, attachUserProfileDepartment, async (req, res) => {
   try {
     const { startDate, endDate, department, projectId } = req.query || {};
 
@@ -90,7 +115,9 @@ router.get('/logs/trend', authMiddleware, async (req, res) => {
     to.setHours(23, 59, 59, 999);
 
     const match = { timestamp: { $gte: from, $lte: to } };
-    if (department && department !== 'All') match.department = department;
+    const scopedDepartment = getScopedDepartment(req);
+    if (scopedDepartment) match.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+    else if (department && department !== 'All') match.department = department;
     if (projectId) match.projectId = projectId;
 
     const trend = await InventoryLog.aggregate([
@@ -135,13 +162,15 @@ router.get('/logs/trend', authMiddleware, async (req, res) => {
 });
 
 // Get consumption logs (OUT movements)
-router.get('/logs', authMiddleware, async (req, res) => {
+router.get('/logs', authMiddleware, attachUserProfileDepartment, async (req, res) => {
   try {
     const { type, department, projectId, search, limit = 10, page = 1 } = req.query;
     const query = {};
     
     if (type) query.type = type;
-    if (department && department !== 'All') query.department = department;
+    const scopedDepartment = getScopedDepartment(req);
+    if (scopedDepartment) query.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+    else if (department && department !== 'All') query.department = department;
     if (projectId) query.projectId = projectId;
     if (search) {
       query.$or = [
@@ -172,7 +201,7 @@ router.get('/logs', authMiddleware, async (req, res) => {
 });
 
 // Get all inventory assets (With Filtering and Pagination)
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, attachUserProfileDepartment, async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -191,8 +220,10 @@ router.get('/', authMiddleware, async (req, res) => {
       query.$expr = { $lte: ["$availableQuantity", { $ifNull: ["$lowStockThreshold", 5] }] };
     }
 
-    // Department Filter
-    if (department && department !== 'All') {
+    const scopedDepartment = getScopedDepartment(req);
+    if (scopedDepartment) {
+      query.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+    } else if (department && department !== 'All') {
       query.department = department;
     }
 
@@ -258,17 +289,27 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // Search asset by AssetId or SKU
-router.get('/id/:id', authMiddleware, async (req, res) => {
+router.get('/id/:id', authMiddleware, attachUserProfileDepartment, async (req, res) => {
   try {
     const rawId = String(req.params.id || '');
+    const scopedDepartment = getScopedDepartment(req);
     if (mongoose.Types.ObjectId.isValid(rawId)) {
       const byMongoId = await Asset.findById(rawId);
-      if (byMongoId) return res.json(byMongoId);
+      if (byMongoId) {
+        if (
+          scopedDepartment &&
+          normalizeDepartmentForCompare(byMongoId.department) !== normalizeDepartmentForCompare(scopedDepartment)
+        ) {
+          return res.status(404).json({ message: 'Asset not found' });
+        }
+        return res.json(byMongoId);
+      }
     }
 
-    const asset = await Asset.findOne({
-      $or: [{ assetId: rawId }, { sku: rawId }]
-    });
+    const query = { $or: [{ assetId: rawId }, { sku: rawId }] };
+    if (scopedDepartment) query.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+
+    const asset = await Asset.findOne(query);
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
     res.json(asset);
   } catch (error) {
@@ -683,12 +724,14 @@ router.post('/undo-utilization', authMiddleware, roleMiddleware([ROLES.ADMIN, RO
   }
 });
 
-router.get('/finance/valuation', authMiddleware, roleMiddleware([ROLES.FINANCE, ROLES.ADMIN]), async (req, res) => {
+router.get('/finance/valuation', authMiddleware, attachUserProfileDepartment, roleMiddleware([ROLES.FINANCE, ROLES.ADMIN]), async (req, res) => {
   try {
     const { department, search, limit = 200, page = 1 } = req.query;
     const query = {};
 
-    if (department && department !== 'All') query.department = department;
+    const scopedDepartment = getScopedDepartment(req);
+    if (scopedDepartment) query.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+    else if (department && department !== 'All') query.department = department;
     if (search) {
       query.$or = [
         { itemName: { $regex: search, $options: 'i' } },
@@ -737,7 +780,7 @@ router.get('/finance/valuation', authMiddleware, roleMiddleware([ROLES.FINANCE, 
   }
 });
 
-router.get('/finance/cost-history', authMiddleware, roleMiddleware([ROLES.FINANCE, ROLES.ADMIN]), async (req, res) => {
+router.get('/finance/cost-history', authMiddleware, attachUserProfileDepartment, roleMiddleware([ROLES.FINANCE, ROLES.ADMIN]), async (req, res) => {
   try {
     const { assetIdOrSku, from, to, limit = 100, page = 1 } = req.query;
     if (!assetIdOrSku) {
@@ -752,6 +795,14 @@ router.get('/finance/cost-history', authMiddleware, roleMiddleware([ROLES.FINANC
       ]
     });
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
+
+    const scopedDepartment = getScopedDepartment(req);
+    if (
+      scopedDepartment &&
+      normalizeDepartmentForCompare(asset.department) !== normalizeDepartmentForCompare(scopedDepartment)
+    ) {
+      return res.status(404).json({ message: 'Asset not found' });
+    }
 
     const query = { assetId: asset.assetId };
     if (from || to) {
@@ -789,7 +840,7 @@ router.get('/finance/cost-history', authMiddleware, roleMiddleware([ROLES.FINANC
   }
 });
 
-router.get('/finance/wastage-analytics', authMiddleware, roleMiddleware([ROLES.FINANCE, ROLES.ADMIN]), async (req, res) => {
+router.get('/finance/wastage-analytics', authMiddleware, attachUserProfileDepartment, roleMiddleware([ROLES.FINANCE, ROLES.ADMIN]), async (req, res) => {
   try {
     const { department, from, to } = req.query;
 
@@ -797,7 +848,9 @@ router.get('/finance/wastage-analytics', authMiddleware, roleMiddleware([ROLES.F
       type: 'OUT',
       reason: { $in: ['WASTAGE', 'EXPIRED', 'DAMAGED', 'SHRINKAGE'] }
     };
-    if (department && department !== 'All') match.department = department;
+    const scopedDepartment = getScopedDepartment(req);
+    if (scopedDepartment) match.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+    else if (department && department !== 'All') match.department = department;
     if (from || to) {
       match.timestamp = {};
       if (from) match.timestamp.$gte = new Date(from);

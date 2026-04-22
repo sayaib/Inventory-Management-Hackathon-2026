@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
 import { ChevronLeft, ChevronRight, RefreshCcw, Search, X } from 'lucide-react';
+import Alert from './ui/Alert';
 
 const formatDateTime = (value) => {
   if (!value) return '';
@@ -112,7 +113,7 @@ const AuditLog = () => {
         <form onSubmit={onApplyFilters} className="grid grid-cols-1 gap-3 p-4 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <label className="block text-xs font-bold text-slate-600">Search</label>
-            <div className="mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15">
               <Search className="h-4 w-4 text-slate-400" />
               <input
                 value={search}
@@ -128,7 +129,7 @@ const AuditLog = () => {
             <select
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              className="mt-1 app-select"
             >
               <option value="">All actions</option>
               {actionOptions.map((a) => (
@@ -144,7 +145,7 @@ const AuditLog = () => {
             <input
               value={actor}
               onChange={(e) => setActor(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              className="mt-1 app-input"
               placeholder="Email or username"
             />
           </div>
@@ -155,7 +156,7 @@ const AuditLog = () => {
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              className="mt-1 app-input"
             />
           </div>
 
@@ -165,7 +166,7 @@ const AuditLog = () => {
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none"
+              className="mt-1 app-input"
             />
           </div>
 
@@ -190,29 +191,27 @@ const AuditLog = () => {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
-          {error}
-        </div>
+        <Alert variant="error">{error}</Alert>
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="app-table">
+            <thead className="app-thead">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                <th className="app-th">
                   When
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                <th className="app-th">
                   Actor
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                <th className="app-th">
                   Action
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                <th className="app-th">
                   Entity
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                <th className="app-th">
                   Details
                 </th>
               </tr>
@@ -220,13 +219,13 @@ const AuditLog = () => {
             <tbody className="divide-y divide-slate-200">
               {loading ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-slate-600" colSpan={5}>
+                  <td className="app-td py-6 text-slate-600" colSpan={5}>
                     Loading…
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-slate-600" colSpan={5}>
+                  <td className="app-td py-6 text-slate-600" colSpan={5}>
                     No audit events match your filters.
                   </td>
                 </tr>
@@ -234,24 +233,24 @@ const AuditLog = () => {
                 logs.map((log) => (
                   <tr
                     key={log._id}
-                    className="cursor-pointer hover:bg-slate-50"
+                    className="cursor-pointer app-tr"
                     onClick={() => setSelected(log)}
                   >
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-700">
+                    <td className="whitespace-nowrap app-td font-semibold">
                       {formatDateTime(log.occurredAt || log.createdAt)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="app-td">
                       <div className="font-bold text-slate-900">{log.actor?.username || '—'}</div>
                       <div className="text-xs text-slate-500">{log.actor?.email || ''}</div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-extrabold text-slate-900">
+                    <td className="whitespace-nowrap app-td font-extrabold text-slate-900">
                       {log.action}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="app-td">
                       <div className="font-bold text-slate-900">{log.entity?.type || '—'}</div>
                       <div className="text-xs text-slate-500">{log.entity?.id || ''}</div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td className="app-td">
                       <div className="line-clamp-2 max-w-xl text-xs text-slate-600">
                         {safePrettyJson(log.details).slice(0, 160)}
                         {safePrettyJson(log.details).length > 160 ? '…' : ''}
@@ -293,7 +292,7 @@ const AuditLog = () => {
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/30 p-4 sm:items-center">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/30 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Audit log details">
           <div className="w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
               <div className="min-w-0">

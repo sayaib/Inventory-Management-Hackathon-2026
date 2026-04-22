@@ -21,8 +21,12 @@ const normalizeDepartmentForCompare = (value) => String(value || '').trim().toLo
 
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const ALL_DEPARTMENTS_LABEL = 'All Departments';
+
+const isAllDepartments = (value) => normalizeDepartmentForCompare(value) === normalizeDepartmentForCompare(ALL_DEPARTMENTS_LABEL);
+
 const attachUserProfileDepartment = async (req, res, next) => {
-  if (!req.user || req.user.role !== ROLES.PROJECT_MANAGER) return next();
+  if (!req.user) return next();
   if (req.user.profileDepartment !== undefined) return next();
 
   try {
@@ -34,17 +38,35 @@ const attachUserProfileDepartment = async (req, res, next) => {
   next();
 };
 
+const getScopedDepartment = (req) => {
+  const raw = String(req.user?.profileDepartment || '').trim();
+  if (!raw) return '';
+  if (isAllDepartments(raw)) return '';
+  return raw;
+};
+
 const findAssetByIdOrSku = async (assetIdOrSku) => {
   return await Asset.findOne({ $or: [{ assetId: assetIdOrSku }, { sku: assetIdOrSku }] });
 };
 
 const canAccessProject = (req, project) => {
   if (!req.user) return false;
-  if ([ROLES.ADMIN, ROLES.INVENTORY_MANAGER, ROLES.PRESALE].includes(req.user.role)) return true;
+  if (req.user.role === ROLES.ADMIN) return true;
+
+  const scopedDepartment = getScopedDepartment(req);
+  const rawDepartment = String(req.user.profileDepartment || '').trim();
+  const projectDept = normalizeDepartmentForCompare(project?.department);
+
+  if (scopedDepartment) {
+    const scopedKey = normalizeDepartmentForCompare(scopedDepartment);
+    if (!projectDept || projectDept !== scopedKey) return false;
+    if ([ROLES.INVENTORY_MANAGER, ROLES.PRESALE, ROLES.PROJECT_MANAGER].includes(req.user.role)) return true;
+  }
+
+  if (req.user.role === ROLES.PROJECT_MANAGER && isAllDepartments(rawDepartment)) return true;
 
   if (req.user.role === ROLES.PROJECT_MANAGER) {
     const userDept = normalizeDepartmentForCompare(req.user.profileDepartment);
-    const projectDept = normalizeDepartmentForCompare(project?.department);
     if (userDept && projectDept && userDept === projectDept) return true;
   }
 
@@ -57,11 +79,14 @@ const canAccessProject = (req, project) => {
 router.get('/', authMiddleware, attachUserProfileDepartment, canViewProjects, async (req, res) => {
   try {
     const query = {};
+    const scopedDepartment = getScopedDepartment(req);
+    const rawDepartment = String(req.user.profileDepartment || '').trim();
+    if (scopedDepartment) {
+      query.department = new RegExp(`^${escapeRegExp(scopedDepartment)}$`, 'i');
+    }
+
     if (req.user.role === ROLES.PROJECT_MANAGER) {
-      const rawDept = String(req.user.profileDepartment || '').trim();
-      if (rawDept) {
-        query.department = new RegExp(`^${escapeRegExp(rawDept)}$`, 'i');
-      } else {
+      if (!scopedDepartment && !isAllDepartments(rawDepartment)) {
         const requesterEmail = (req.user.email || '').toLowerCase();
         if (requesterEmail) {
           query.$or = [{ managerEmail: requesterEmail }, { managerUserId: req.user.id }];

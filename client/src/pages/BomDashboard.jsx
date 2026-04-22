@@ -25,7 +25,7 @@ const BomDashboard = () => {
   const canEditBom = user?.role === ROLES.PRESALE;
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const userDept = normalizeDepartment(user?.profile?.department);
-  const lockDepartment = isProjectManager && userDept !== 'Unassigned';
+  const lockDepartment = isProjectManager && userDept !== 'Unassigned' && userDept !== 'All Departments';
   const fetchProjects = useCallback(async () => {
     setLoading(true);
     setError('');

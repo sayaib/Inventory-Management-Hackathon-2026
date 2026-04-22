@@ -26,7 +26,12 @@ const userSchema = new mongoose.Schema({
     state: { type: String, default: '' },
     postalCode: { type: String, default: '' },
     country: { type: String, default: '' },
-    avatarUrl: { type: String, default: '' },
+    avatarImage: {
+      data: { type: Buffer },
+      contentType: { type: String, default: '' },
+      size: { type: Number, default: 0 },
+      updatedAt: { type: Date }
+    },
     bio: { type: String, default: '' }
   },
   password: {

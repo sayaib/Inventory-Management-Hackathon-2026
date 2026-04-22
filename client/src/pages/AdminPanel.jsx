@@ -1,8 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { Shield, LogOut, User as UserIcon, Settings, BarChart3, Users, LayoutDashboard, Package, History, FolderKanban, Download, Menu, X } from 'lucide-react';
 import UserManagement from '../components/UserManagement';
 import AuditLog from '../components/AuditLog';
 import AdminProfile from '../components/AdminProfile';
@@ -12,9 +11,11 @@ import { ASSET_CATEGORIES, DEPARTMENTS } from '../constants/assets';
 const APP_LOGO_URL =
   'https://media.licdn.com/dms/image/v2/C560BAQFO8hoGBGODpQ/company-logo_200_200/company-logo_200_200/0/1679632744041/optimized_solutions_ltd_logo?e=2147483647&v=beta&t=OcX_6ep-DXZSrhdR4f3gmnv_Imt4NdVA7-VPf_X1j5U';
 
-const AdminPanel = () => {
+const AdminPanel = ({ initialTab }) => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => initialTab || 'overview');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const location = useLocation();
   const [stats, setStats] = useState({
     users: 0,
     inventory: 0,
@@ -36,7 +37,7 @@ const AdminPanel = () => {
   const [deptQty, setDeptQty] = useState([]);
   const [deptValue, setDeptValue] = useState([]);
   const purchasesRef = useRef(null);
-  const [purchasesWidth, setPurchasesWidth] = useState(600);
+  const [purchasesWidth, setPurchasesWidth] = useState(0);
   const [projectStatusRows, setProjectStatusRows] = useState([]);
   const [projectStatusLoading, setProjectStatusLoading] = useState(false);
   const [projectStatusError, setProjectStatusError] = useState('');
@@ -176,6 +177,31 @@ const AdminPanel = () => {
       setSelectedCompanyLocation(locations[0] || '');
     }
   }, [companyDirectory, selectedCompanyId, selectedCompanyLocation]);
+
+  useEffect(() => {
+    if (!initialTab) return;
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (initialTab) return;
+    const pathname = String(location?.pathname || '');
+    if (!pathname.startsWith('/admin')) return;
+
+    const seg = pathname.split('/')[2] || 'overview';
+    const routeToTab = {
+      overview: 'overview',
+      'project-status': 'projectStatus',
+      predictions: 'prediction',
+      users: 'users',
+      'audit-logs': 'audit',
+      reports: 'reports',
+      settings: 'settings'
+    };
+
+    const nextTab = routeToTab[seg] || 'overview';
+    setActiveTab(nextTab);
+  }, [initialTab, location?.pathname]);
 
   useEffect(() => {
     const el = purchasesRef.current;
@@ -436,8 +462,8 @@ const AdminPanel = () => {
     return rows;
   };
 
-  const parseWorksheetRows = (sheet) => {
-    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  const parseWorksheetRows = (sheet, xlsx) => {
+    const matrix = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
     const nonEmptyRows = matrix.filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
     if (nonEmptyRows.length === 0) return [];
 
@@ -463,6 +489,8 @@ const AdminPanel = () => {
     }
 
     const buf = await file.arrayBuffer();
+    const xlsxModule = await import('xlsx');
+    const XLSX = xlsxModule.default ?? xlsxModule;
     const wb = XLSX.read(buf, { type: 'array' });
     const sheetName =
       wb.SheetNames.find((s) => String(s || '').trim().toLowerCase() === 'bom') ||
@@ -470,7 +498,7 @@ const AdminPanel = () => {
       '';
     const sheet = sheetName ? wb.Sheets[sheetName] : null;
     if (!sheet) return [];
-    return parseWorksheetRows(sheet);
+    return parseWorksheetRows(sheet, XLSX);
   };
 
   const runPredictionFromProject = async (projectId) => {
@@ -584,7 +612,7 @@ const AdminPanel = () => {
     return all;
   };
   
-  const fetchLowStock = async () => {
+  const fetchLowStock = useCallback(async () => {
     setLowStockLoading(true);
     setLowStockError('');
     try {
@@ -603,9 +631,9 @@ const AdminPanel = () => {
     } finally {
       setLowStockLoading(false);
     }
-  };
+  }, [lowStockDept, lowStockPage, lowStockSearch]);
   
-  const fetchValuation = async () => {
+  const fetchValuation = useCallback(async () => {
     setValuationLoading(true);
     setValuationError('');
     try {
@@ -624,9 +652,9 @@ const AdminPanel = () => {
     } finally {
       setValuationLoading(false);
     }
-  };
+  }, [valuationDept, valuationPage, valuationSearch]);
   
-  const fetchReportLogs = async () => {
+  const fetchReportLogs = useCallback(async () => {
     setReportLogLoading(true);
     setReportLogError('');
     try {
@@ -644,25 +672,14 @@ const AdminPanel = () => {
     } finally {
       setReportLogLoading(false);
     }
-  };
+  }, [reportLogPage, reportLogSearch, reportLogType]);
   
   useEffect(() => {
     if (activeTab !== 'reports') return;
     fetchLowStock();
     fetchValuation();
     fetchReportLogs();
-  }, [
-    activeTab,
-    lowStockPage,
-    lowStockDept,
-    lowStockSearch,
-    valuationPage,
-    valuationDept,
-    valuationSearch,
-    reportLogPage,
-    reportLogType,
-    reportLogSearch
-  ]);
+  }, [activeTab, fetchLowStock, fetchReportLogs, fetchValuation]);
 
   const formatDateTime = (value) => {
     if (!value) return '-';
@@ -672,15 +689,15 @@ const AdminPanel = () => {
   };
 
   const navItems = [
-    { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { key: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin/overview' },
+    { key: 'projectStatus', label: 'Project Status', icon: FolderKanban, href: '/admin/project-status' },
+    { key: 'prediction', label: 'Prediction', icon: BarChart3, href: '/admin/predictions' },
+    { key: 'users', label: 'Users', icon: Users, href: '/admin/users' },
+    { key: 'audit', label: 'Audit Logs', icon: History, href: '/admin/audit-logs' },
+    { key: 'reports', label: 'Reports', icon: BarChart3, href: '/admin/reports' },
+    { key: 'settings', label: 'Settings', icon: Settings, href: '/admin/settings' },
     { key: 'inventory', label: 'Inventory', icon: Package, href: '/inventory?from=admin' },
-    { key: 'projectStatus', label: 'Project Status', icon: FolderKanban },
-    { key: 'prediction', label: 'Prediction', icon: BarChart3 },
-    { key: 'reports', label: 'Reports', icon: BarChart3 },
-    { key: 'audit', label: 'Audit Logs', icon: History },
-    { key: 'users', label: 'Users', icon: Users },
-    { key: 'settings', label: 'Settings', icon: Settings },
-    { key: 'profile', label: 'Profile', icon: UserIcon }
+    { key: 'profile', label: 'Profile', icon: UserIcon, href: '/profile?from=admin' }
   ];
 
   const deptQtyMap = (() => {
@@ -773,9 +790,42 @@ const AdminPanel = () => {
     list.sort((a, b) => String(a?.code || '').localeCompare(String(b?.code || '')));
     return list;
   })();
+
+  const pageTitle =
+    activeTab === 'users'
+      ? 'User Management'
+      : activeTab === 'profile'
+        ? 'Your Profile'
+        : activeTab === 'audit'
+          ? 'Audit Logs'
+          : activeTab === 'projectStatus'
+            ? 'Project Status'
+            : activeTab === 'prediction'
+              ? 'Prediction Inventory'
+              : activeTab === 'reports'
+                ? 'Reports'
+                : activeTab === 'settings'
+                  ? 'Settings'
+                  : 'Overview';
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mobileNavOpen]);
  
   return (
-    <div className="min-h-screen app-bg">
+    <div className="min-h-screen app-bg admin-panel">
       <div className="flex min-h-screen w-full">
         <aside className="hidden w-60 shrink-0 border-r border-slate-800/40 bg-slate-950 text-slate-100 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
           <div className="flex items-center gap-3 px-4 py-4">
@@ -798,48 +848,24 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-2">
+          <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2">
             <div className="space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
-                const isDisabled = item.disabled === true;
-                const content = (
-                  <>
-                    <Icon className="h-4 w-4" />
-                    <span className="truncate">{item.label}</span>
-                    {isDisabled && <span className="ml-auto text-[10px] font-bold text-slate-300">Soon</span>}
-                  </>
-                );
-                if (item.href) {
-                  return (
-                    <Link
-                      key={item.key}
-                      to={item.href}
-                      className={[
-                        'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
-                        'text-slate-200 hover:bg-white/5 hover:text-white'
-                      ].join(' ')}
-                    >
-                      {content}
-                    </Link>
-                  );
-                }
                 return (
-                  <button
+                  <Link
                     key={item.key}
-                    type="button"
-                    disabled={isDisabled}
-                    onClick={() => setActiveTab(item.key)}
+                    to={item.href}
                     className={[
                       'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
-                      isActive ? 'bg-primary/20 text-white' : 'text-slate-200 hover:bg-white/5 hover:text-white',
-                      isDisabled ? 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-slate-200' : ''
+                      isActive ? 'bg-primary/20 text-white' : 'text-slate-200 hover:bg-white/5 hover:text-white'
                     ].join(' ')}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    {content}
-                  </button>
+                    <Icon className="h-4 w-4" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
                 );
               })}
             </div>
@@ -869,23 +895,19 @@ const AdminPanel = () => {
         <main className="min-w-0 flex-1 lg:ml-60">
           <header className="sticky top-0 z-10 app-nav">
             <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
-              <div className="min-w-0">
-                <h1 className="truncate text-base font-extrabold text-slate-900">
-                  {activeTab === 'users'
-                    ? 'User Management'
-                    : activeTab === 'profile'
-                      ? 'Your Profile'
-                      : activeTab === 'audit'
-                        ? 'Audit Logs'
-                        : activeTab === 'projectStatus'
-                          ? 'Project Status'
-                          : activeTab === 'prediction'
-                            ? 'Prediction Inventory'
-                            : activeTab === 'reports'
-                              ? 'Reports'
-                              : 'Overview'}
-                </h1>
-                <p className="truncate text-xs text-slate-500">Admin controls for inventory operations</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <button
+                  type="button"
+                  className="app-icon-btn lg:hidden"
+                  onClick={() => setMobileNavOpen(true)}
+                  aria-label="Open navigation"
+                >
+                  <Menu className="h-4 w-4" />
+                </button>
+                <div className="min-w-0">
+                  <h1 className="truncate text-base font-extrabold text-slate-900">{pageTitle}</h1>
+                  <p className="truncate text-xs text-slate-500">Admin controls for inventory operations</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 sm:flex">
@@ -895,58 +917,87 @@ const AdminPanel = () => {
                 <button
                   type="button"
                   onClick={logout}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 lg:hidden"
+                  className="app-btn app-btn-secondary lg:hidden px-3 py-2"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign out
                 </button>
               </div>
             </div>
+          </header>
 
-            <div className="border-t border-slate-200 bg-white lg:hidden">
-              <div className="w-full overflow-x-auto px-4 py-2 sm:px-6">
-                <div className="flex w-max items-center gap-2">
-                  {navItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.key;
-                    const isDisabled = item.disabled === true;
-                    const content = (
-                      <>
-                        <Icon className="h-3.5 w-3.5" />
-                        {item.label}
-                      </>
-                    );
-                    if (item.href) {
+          {mobileNavOpen && (
+            <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
+              <button
+                type="button"
+                className="absolute inset-0 bg-slate-950/30 backdrop-blur-sm"
+                aria-label="Close navigation"
+                onClick={() => setMobileNavOpen(false)}
+              />
+              <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-slate-200 bg-white shadow-2xl">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+                      <img
+                        src={APP_LOGO_URL}
+                        alt="Optimized Solutions Ltd"
+                        className="h-6 w-6 rounded bg-white object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                    <div className="leading-tight">
+                      <div className="text-sm font-extrabold text-slate-900">Admin Portal</div>
+                      <div className="text-xs text-slate-500">Inventory control</div>
+                    </div>
+                  </div>
+                  <button type="button" className="app-icon-btn h-9 w-9" onClick={() => setMobileNavOpen(false)} aria-label="Close">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2 pb-4">
+                  <div className="space-y-1">
+                    {navItems.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.key;
                       return (
                         <Link
                           key={item.key}
                           to={item.href}
-                          className="inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 text-xs font-bold transition"
+                          onClick={() => setMobileNavOpen(false)}
+                          className={[
+                            'w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-extrabold transition',
+                            isActive ? 'bg-primary/10 text-primary-800' : 'text-slate-700 hover:bg-slate-50'
+                          ].join(' ')}
+                          aria-current={isActive ? 'page' : undefined}
                         >
-                          {content}
+                          <Icon className="h-4 w-4" />
+                          <span className="truncate">{item.label}</span>
                         </Link>
                       );
-                    }
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        disabled={isDisabled}
-                        onClick={() => setActiveTab(item.key)}
-                        className={[
-                          'inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold transition',
-                          isActive ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
-                          isDisabled ? 'cursor-not-allowed opacity-50' : ''
-                        ].join(' ')}
-                      >
-                        {content}
-                      </button>
-                    );
-                  })}
+                    })}
+                  </div>
+                </nav>
+
+                <div className="shrink-0 border-t border-slate-200 p-3">
+                  <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-700 ring-1 ring-slate-200">
+                      <UserIcon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-extrabold text-slate-900">{user?.username || 'Admin'}</div>
+                      <div className="truncate text-xs text-slate-500">{user?.email || ' '}</div>
+                    </div>
+                  </div>
+                  <button type="button" onClick={logout} className="mt-2 w-full app-btn app-btn-secondary">
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </button>
                 </div>
               </div>
             </div>
-          </header>
+          )}
 
           <div className="w-full px-4 py-4 sm:px-6">
             {activeTab === 'overview' && (
@@ -1008,12 +1059,12 @@ const AdminPanel = () => {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                  <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="text-sm font-extrabold text-slate-900">Purchases by date</h3>
                       <p className="text-xs text-slate-500">Counts of items by purchase date</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap sm:justify-end">
                       <div className="hidden sm:flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
                         {[
                           { key: '7d', label: '7d', days: 7 },
@@ -1054,7 +1105,7 @@ const AdminPanel = () => {
                           Custom
                         </button>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <input
                           type="date"
                           value={startDate}
@@ -1062,9 +1113,9 @@ const AdminPanel = () => {
                             setRangePreset('custom');
                             setStartDate(e.target.value);
                           }}
-                          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700"
+                          className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 sm:w-auto"
                         />
-                        <span className="text-xs font-bold text-slate-500">–</span>
+                        <span className="hidden text-xs font-bold text-slate-500 sm:inline">–</span>
                         <input
                           type="date"
                           value={endDate}
@@ -1072,7 +1123,7 @@ const AdminPanel = () => {
                             setRangePreset('custom');
                             setEndDate(e.target.value);
                           }}
-                          className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700"
+                          className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 sm:w-auto"
                         />
                       </div>
                     </div>
@@ -1087,7 +1138,11 @@ const AdminPanel = () => {
                       const padR = 16;
                       const padT = 16;
                       const padB = 32;
-                      const width = purchasesWidth;
+                      if (!purchasesWidth) {
+                        return <div className="h-[220px] w-full app-skeleton" />;
+                      }
+
+                      const width = Math.max(320, purchasesWidth);
                       const chartW = Math.max(0, width - padL - padR);
                       const chartH = height - padB - padT;
                       const n = Math.max(1, data.length);
@@ -1098,7 +1153,7 @@ const AdminPanel = () => {
                         barW = Math.max(2, Math.floor((chartW - (n - 1) * barGap) / n));
                       }
                       return (
-                        <div className="w-full">
+                        <div className="w-full overflow-x-auto">
                           {data.length === 0 ? (
                             <div className="text-sm text-slate-500">No recent inventory additions.</div>
                           ) : (
@@ -1158,12 +1213,12 @@ const AdminPanel = () => {
                 </div>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <div className="rounded-xl border border-slate-200 bg-white">
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                    <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <h3 className="text-sm font-extrabold text-slate-900">Stock movement trend</h3>
                         <p className="text-xs text-slate-500">IN vs OUT within selected dates</p>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] font-bold">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
                         <span className="inline-flex items-center gap-1 text-primary-700"><span className="h-2 w-2 rounded-full bg-primary"></span> IN</span>
                         <span className="inline-flex items-center gap-1 text-rose-700"><span className="h-2 w-2 rounded-full bg-rose-600"></span> OUT</span>
                       </div>
@@ -1286,7 +1341,7 @@ const AdminPanel = () => {
                                 const pct = maxVal > 0 ? Math.round((d.qty / maxVal) * 100) : 0;
                                 return (
                                   <div key={d.department} className="flex items-center gap-3">
-                                    <div className="w-28 shrink-0 text-xs font-bold text-slate-700">{d.department}</div>
+                                    <div className="w-24 shrink-0 truncate text-xs font-bold text-slate-700 sm:w-28" title={d.department}>{d.department}</div>
                                     <div className="flex-1 h-3 rounded-full bg-slate-100">
                                       <div className="h-3 rounded-full bg-primary" style={{ width: `${pct}%` }}></div>
                                     </div>
@@ -1322,7 +1377,7 @@ const AdminPanel = () => {
                               const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
                               return (
                                 <div key={d.department} className="flex items-center gap-3">
-                                  <div className="w-28 shrink-0 text-xs font-bold text-slate-700">{d.department}</div>
+                                  <div className="w-24 shrink-0 truncate text-xs font-bold text-slate-700 sm:w-28" title={d.department}>{d.department}</div>
                                   <div className="flex-1 h-3 rounded-full bg-slate-100">
                                     <div className="h-3 rounded-full bg-primary" style={{ width: `${pct}%` }}></div>
                                   </div>
@@ -1339,16 +1394,16 @@ const AdminPanel = () => {
                 </div>
  
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="border-b border-slate-200 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-extrabold text-slate-900">Current inventory status</div>
                       <div className="text-xs text-slate-500">Project-wise inventory allocation and utilization snapshot.</div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap sm:justify-end">
                       <select
                         value={inventoryStatusProjectId}
                         onChange={(e) => setInventoryStatusProjectId(e.target.value)}
-                        className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-extrabold text-slate-700"
+                        className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-extrabold text-slate-700 sm:w-auto"
                       >
                         {projectStatusRows
                           .slice()
@@ -1364,7 +1419,7 @@ const AdminPanel = () => {
                             );
                           })}
                       </select>
-                      <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+                      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
                         {[
                           { key: 'all', label: 'All linked' },
                           { key: 'assigned', label: 'Assigned' },
@@ -1450,7 +1505,7 @@ const AdminPanel = () => {
                       }
 
                       return (
-                        <table className="min-w-[1100px] w-full text-left text-xs">
+                        <table className="app-table min-w-[1100px] w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200">
                             <tr className="text-[11px] font-extrabold text-slate-700">
                               <th className="px-4 py-3">Sr No</th>
@@ -1539,9 +1594,7 @@ const AdminPanel = () => {
                 </div>
 
                 {projectStatusError && (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
-                    {projectStatusError}
-                  </div>
+                  <div className="app-alert app-alert-error text-sm font-bold">{projectStatusError}</div>
                 )}
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -1573,7 +1626,7 @@ const AdminPanel = () => {
                       );
 
                       return (
-                        <table className="min-w-[1100px] w-full text-left text-xs">
+                        <table className="app-table min-w-[1100px] w-full text-left text-xs">
                           <thead className="bg-slate-50 border-b border-slate-200">
                             <tr className="text-[11px] font-extrabold text-slate-700">
                               <th className="px-4 py-3">Project</th>
@@ -1681,7 +1734,7 @@ const AdminPanel = () => {
                                             </div>
                                           ) : (
                                             <div className="overflow-auto rounded-xl border border-slate-200 bg-white">
-                                              <table className="min-w-[1100px] w-full text-left text-xs">
+                                              <table className="app-table min-w-[1100px] w-full text-left text-xs">
                                                 <thead className="bg-slate-50 border-b border-slate-200">
                                                   <tr className="text-[11px] font-extrabold text-slate-700">
                                                     <th className="px-3 py-2">Sr No</th>
@@ -1780,9 +1833,7 @@ const AdminPanel = () => {
                   </div>
 
                   {predictionError && (
-                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-                      {predictionError}
-                    </div>
+                    <div className="app-alert app-alert-error">{predictionError}</div>
                   )}
 
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -1924,7 +1975,7 @@ const AdminPanel = () => {
                   </div>
 
                   <div className="w-full overflow-auto">
-                    <table className="min-w-[1400px] w-full text-left text-xs">
+                    <table className="app-table min-w-[1400px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Item</th>
@@ -2074,12 +2125,10 @@ const AdminPanel = () => {
                     </div>
                   </div>
                   {lowStockError && (
-                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-                      {lowStockError}
-                    </div>
+                    <div className="mt-3 app-alert app-alert-error">{lowStockError}</div>
                   )}
                   <div className="mt-3 w-full overflow-auto">
-                    <table className="min-w-[1100px] w-full text-left text-xs">
+                    <table className="app-table min-w-[1100px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Asset</th>
@@ -2128,7 +2177,7 @@ const AdminPanel = () => {
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-[11px] font-bold text-slate-500">Page {lowStockPage} / {lowStockTotalPages}</div>
                     <div className="flex items-center gap-2">
                       <button
@@ -2209,9 +2258,7 @@ const AdminPanel = () => {
                 </div>
 
                 {projectStatusError && (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
-                    {projectStatusError}
-                  </div>
+                  <div className="app-alert app-alert-error text-sm font-bold">{projectStatusError}</div>
                 )}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -2274,15 +2321,13 @@ const AdminPanel = () => {
                     </div>
                   </div>
                   {valuationError && (
-                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-                      {valuationError}
-                    </div>
+                    <div className="mt-3 app-alert app-alert-error">{valuationError}</div>
                   )}
                   <div className="mt-3 border-b border-slate-200 px-4 py-2 text-[11px] font-bold text-slate-700">
                     Total snapshot value: {formatRupees(valuationTotalValue)}
                   </div>
                   <div className="w-full overflow-auto">
-                    <table className="min-w-[1100px] w-full text-left text-xs">
+                    <table className="app-table min-w-[1100px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Asset</th>
@@ -2320,7 +2365,7 @@ const AdminPanel = () => {
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-[11px] font-bold text-slate-500">Page {valuationPage} / {valuationTotalPages}</div>
                     <div className="flex items-center gap-2">
                       <button
@@ -2407,12 +2452,10 @@ const AdminPanel = () => {
                     </div>
                   </div>
                   {reportLogError && (
-                    <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
-                      {reportLogError}
-                    </div>
+                    <div className="mt-3 app-alert app-alert-error">{reportLogError}</div>
                   )}
                   <div className="w-full overflow-auto mt-3">
-                    <table className="min-w-[1200px] w-full text-left text-xs">
+                    <table className="app-table min-w-[1200px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Type</th>
@@ -2460,7 +2503,7 @@ const AdminPanel = () => {
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-[11px] font-bold text-slate-500">Page {reportLogPage} / {reportLogTotalPages}</div>
                     <div className="flex items-center gap-2">
                       <button
@@ -2484,14 +2527,14 @@ const AdminPanel = () => {
                 </div>
                 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="border-b border-slate-200 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-xs font-extrabold text-slate-700">Department summary</div>
                     <div className="text-[11px] font-bold text-slate-500">
                       {projectStatusLoading ? 'Loading…' : `${filteredDeptReport.length} departments`}
                     </div>
                   </div>
                   <div className="w-full overflow-auto">
-                    <table className="min-w-[1100px] w-full text-left text-xs">
+                    <table className="app-table min-w-[1100px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Department</th>
@@ -2545,9 +2588,9 @@ const AdminPanel = () => {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="border-b border-slate-200 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-xs font-extrabold text-slate-700">Project details</div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                       <div className="text-[11px] font-bold text-slate-500">
                         {projectStatusLoading ? 'Loading…' : `${filteredProjectDetails.length} projects`}
                       </div>
@@ -2585,7 +2628,7 @@ const AdminPanel = () => {
                     </div>
                   </div>
                   <div className="w-full overflow-auto">
-                    <table className="min-w-[1200px] w-full text-left text-xs">
+                    <table className="app-table min-w-[1200px] w-full text-left text-xs">
                       <thead className="bg-slate-50 border-b border-slate-200">
                         <tr className="text-[11px] font-extrabold text-slate-700">
                           <th className="px-4 py-3">Project</th>
@@ -2673,14 +2716,10 @@ const AdminPanel = () => {
                 {(companySettingsError || companySettingsSuccess) && (
                   <div className="space-y-2">
                     {companySettingsError && (
-                      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
-                        {companySettingsError}
-                      </div>
+                      <div className="app-alert app-alert-error text-sm font-bold">{companySettingsError}</div>
                     )}
                     {companySettingsSuccess && (
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
-                        {companySettingsSuccess}
-                      </div>
+                      <div className="app-alert border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-bold">{companySettingsSuccess}</div>
                     )}
                   </div>
                 )}
@@ -2888,7 +2927,7 @@ const AdminPanel = () => {
                       </div>
 
                       <div className="rounded-lg border border-slate-200 bg-white p-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div className="text-xs font-extrabold text-slate-700">Locations</div>
                           <button
                             type="button"
@@ -2901,7 +2940,7 @@ const AdminPanel = () => {
                                 return next;
                               });
                             }}
-                            className="h-8 rounded-lg border border-rose-200 bg-rose-50 px-3 text-[11px] font-extrabold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                            className="h-8 w-full rounded-lg border border-rose-200 bg-rose-50 px-3 text-[11px] font-extrabold text-rose-700 hover:bg-rose-100 disabled:opacity-50 sm:w-auto"
                             disabled={bulkApplying || companySettingsSaving || (companyDirectory || []).length <= 1}
                           >
                             Remove company

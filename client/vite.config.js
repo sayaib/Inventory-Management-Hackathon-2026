@@ -8,4 +8,25 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('/xlsx/') || id.endsWith('/xlsx')) return 'xlsx';
+          if (id.includes('/react-router-dom/') || id.includes('/react-router/')) return 'react-router';
+          if (id.includes('/react-dom/') || id.includes('/react/')) return 'react';
+          return 'vendor';
+        },
+      },
+    },
+  },
 })

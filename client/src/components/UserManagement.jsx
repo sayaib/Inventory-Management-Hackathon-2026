@@ -4,10 +4,16 @@ import { UserPlus, User, Mail, Shield, Loader2, Trash2, Pencil, Search, X, Refre
 
 import { ROLES } from '../constants/roles';
 import { useAuth } from '../context/AuthContext';
+import Alert from './ui/Alert';
+import EmptyState from './ui/EmptyState';
+import Spinner from './ui/Spinner';
 
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
   const currentUserId = currentUser?.id || currentUser?._id;
+  const isCurrentAdmin = currentUser?.role === ROLES.ADMIN;
+
+  const ALL_DEPARTMENTS_LABEL = 'All Departments';
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,21 +21,27 @@ const UserManagement = () => {
     username: '',
     email: '',
     password: '',
-    role: ROLES.INVENTORY_MANAGER
+    role: ROLES.INVENTORY_MANAGER,
+    department: ALL_DEPARTMENTS_LABEL
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
   const [tableError, setTableError] = useState('');
   const [editUser, setEditUser] = useState(null);
-  const [editForm, setEditForm] = useState({ username: '', email: '', role: ROLES.INVENTORY_MANAGER, password: '' });
+  const [editForm, setEditForm] = useState({ username: '', email: '', role: ROLES.INVENTORY_MANAGER, password: '', department: ALL_DEPARTMENTS_LABEL });
   const [editError, setEditError] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deleteUser, setDeleteUser] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const [rowBusyId, setRowBusyId] = useState('');
+  const [departments, setDepartments] = useState([]);
+  const [avatarErrorById, setAvatarErrorById] = useState({});
 
   const fetchUsers = async () => {
     try {
@@ -46,6 +58,30 @@ const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const res = await api.get('/settings/company-directory');
+        const list = Array.isArray(res.data?.departments) ? res.data.departments : [];
+        const unique = [];
+        const seen = new Set();
+        for (const d of list) {
+          const value = String(d || '').trim();
+          if (!value) continue;
+          if (value.toLowerCase() === ALL_DEPARTMENTS_LABEL.toLowerCase()) continue;
+          const key = value.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push(value);
+        }
+        if (unique.length > 0) setDepartments(unique);
+      } catch {
+        setDepartments([]);
+      }
+    };
+    loadDepartments();
   }, []);
 
   const handleChange = (e) => {
@@ -69,11 +105,38 @@ const UserManagement = () => {
     return 'bg-muted-100 text-muted-800';
   };
 
+  const departmentOptions = useMemo(() => {
+    const values = new Map();
+    for (const d of departments) {
+      const value = String(d || '').trim();
+      if (!value) continue;
+      values.set(value.toLowerCase(), value);
+    }
+    for (const u of users) {
+      const value = String(u?.profile?.department || '').trim();
+      if (!value) continue;
+      values.set(value.toLowerCase(), value);
+    }
+    return Array.from(values.values()).sort((a, b) => a.localeCompare(b));
+  }, [departments, users]);
+
+  const buildAvatarUrl = (userId, avatarUpdatedAt) => {
+    if (!userId) return '';
+    const updatedAtMs = avatarUpdatedAt ? new Date(avatarUpdatedAt).getTime() : 0;
+    const base = `${api.defaults.baseURL}/auth/users/${userId}/avatar`;
+    return updatedAtMs ? `${base}?v=${updatedAtMs}` : base;
+  };
+
   const filteredUsers = useMemo(() => {
     const normalizedQuery = search.trim().toLowerCase();
     const filtered = users.filter((u) => {
       const matchesRole = roleFilter === 'all' ? true : u.role === roleFilter;
       if (!matchesRole) return false;
+      const matchesDepartment =
+        departmentFilter === 'all'
+          ? true
+          : String(u?.profile?.department || '').trim().toLowerCase() === String(departmentFilter).trim().toLowerCase();
+      if (!matchesDepartment) return false;
       if (!normalizedQuery) return true;
       const username = String(u.username || '').toLowerCase();
       const email = String(u.email || '').toLowerCase();
@@ -81,7 +144,7 @@ const UserManagement = () => {
     });
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return filtered;
-  }, [users, search, roleFilter]);
+  }, [users, search, roleFilter, departmentFilter]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,7 +154,7 @@ const UserManagement = () => {
     try {
       await api.post('/auth/register', formData);
       setSuccess('User created successfully');
-      setFormData({ username: '', email: '', password: '', role: ROLES.INVENTORY_MANAGER });
+      setFormData({ username: '', email: '', password: '', role: ROLES.INVENTORY_MANAGER, department: ALL_DEPARTMENTS_LABEL });
       await fetchUsers();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create user');
@@ -105,11 +168,13 @@ const UserManagement = () => {
     setError('');
     setEditError('');
     setEditUser(u);
+    const currentDepartment = String(u?.profile?.department || '').trim() || ALL_DEPARTMENTS_LABEL;
     setEditForm({
       username: u.username || '',
       email: u.email || '',
       role: u.role || ROLES.INVENTORY_MANAGER,
-      password: ''
+      password: '',
+      department: currentDepartment
     });
   };
 
@@ -132,6 +197,8 @@ const UserManagement = () => {
     };
     if (editForm.role !== editUser.role) payload.role = editForm.role;
     if (editForm.password.trim().length > 0) payload.password = editForm.password;
+    const prevDepartment = String(editUser?.profile?.department || '').trim() || ALL_DEPARTMENTS_LABEL;
+    if (String(editForm.department || '').trim() !== prevDepartment) payload.department = editForm.department;
 
     try {
       const res = await api.put(`/auth/users/${editUser._id}`, payload);
@@ -150,11 +217,15 @@ const UserManagement = () => {
     setSuccess('');
     setError('');
     setTableError('');
+    setDeleteError('');
+    setDeletePassword('');
     setDeleteUser(u);
   };
 
   const closeDelete = () => {
     setDeleteSubmitting(false);
+    setDeleteError('');
+    setDeletePassword('');
     setDeleteUser(null);
   };
 
@@ -163,12 +234,23 @@ const UserManagement = () => {
     setDeleteSubmitting(true);
     setRowBusyId(deleteUser._id);
     try {
-      await api.delete(`/auth/users/${deleteUser._id}`);
+      if (deleteUser.role === ROLES.ADMIN) {
+        const password = String(deletePassword || '');
+        if (!password.trim()) {
+          setDeleteError('Password is required to delete an Admin user');
+          return;
+        }
+        await api.delete(`/auth/users/${deleteUser._id}`, { data: { password } });
+      } else {
+        await api.delete(`/auth/users/${deleteUser._id}`);
+      }
       setUsers((prev) => prev.filter((u) => u._id !== deleteUser._id));
       setSuccess('User deleted successfully');
       closeDelete();
     } catch (err) {
-      setTableError(err.response?.data?.message || 'Failed to delete user');
+      const msg = err.response?.data?.message || 'Failed to delete user';
+      if (deleteUser?.role === ROLES.ADMIN) setDeleteError(msg);
+      else setTableError(msg);
     } finally {
       setDeleteSubmitting(false);
       setRowBusyId('');
@@ -243,7 +325,7 @@ const UserManagement = () => {
                     required
                     value={formData.username}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-input pl-10"
                     placeholder="e.g. warehouse-admin"
                   />
                 </div>
@@ -264,7 +346,7 @@ const UserManagement = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-input pl-10"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -282,7 +364,7 @@ const UserManagement = () => {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-input"
                     placeholder="Temporary password"
                   />
                 </div>
@@ -296,10 +378,10 @@ const UserManagement = () => {
                     name="role"
                     value={formData.role}
                     onChange={handleChange}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-select"
                   >
                     {Object.entries(ROLES)
-                      .filter(([, value]) => value !== ROLES.PROCUREMENT && value !== ROLES.ADMIN)
+                      .filter(([, value]) => value !== ROLES.PROCUREMENT && (isCurrentAdmin ? true : value !== ROLES.ADMIN))
                       .map(([key, value]) => (
                         <option key={value} value={value}>
                           {key
@@ -314,25 +396,36 @@ const UserManagement = () => {
                 </div>
               </div>
 
-              {(error || success) && (
-                <div
-                  className={[
-                    'rounded-xl border px-4 py-3 text-xs font-semibold',
-                    error ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-primary-100 bg-primary-50 text-primary-800'
-                  ].join(' ')}
-                  role={error ? 'alert' : 'status'}
-                  aria-live="polite"
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700" htmlFor="department">
+                  Department
+                </label>
+                <select
+                  id="department"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  className="app-select"
                 >
-                  {error || success}
-                </div>
+                  <option value={ALL_DEPARTMENTS_LABEL}>{ALL_DEPARTMENTS_LABEL}</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {(error || success) && (
+                <Alert variant={error ? 'error' : 'success'}>{error || success}</Alert>
               )}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="app-btn app-btn-primary w-full py-3"
               >
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {submitting && <Spinner className="h-4 w-4" />}
                 Create user
               </button>
             </form>
@@ -354,13 +447,13 @@ const UserManagement = () => {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search username or email…"
-                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15 sm:w-60"
+                    className="app-input pl-9 sm:w-60"
                   />
                 </div>
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                  className="app-select sm:w-52"
                 >
                   <option value="all">All roles</option>
                   {Object.entries(ROLES)
@@ -376,6 +469,18 @@ const UserManagement = () => {
                       </option>
                     ))}
                 </select>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="app-select sm:w-56"
+                >
+                  <option value="all">All departments</option>
+                  {departmentOptions.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -389,6 +494,12 @@ const UserManagement = () => {
                 {success}
               </div>
             )}
+            {!loading && !tableError && (
+              <div className="border-b border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600">
+                Showing <span className="font-extrabold text-slate-900">{filteredUsers.length}</span> of{' '}
+                <span className="font-extrabold text-slate-900">{users.length}</span>
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -396,6 +507,7 @@ const UserManagement = () => {
                   <tr>
                     <th className="px-4 py-3 font-bold">User</th>
                     <th className="px-4 py-3 font-bold">Role</th>
+                    <th className="px-4 py-3 font-bold">Department</th>
                     <th className="px-4 py-3 font-bold">Joined</th>
                     <th className="px-4 py-3 font-bold text-right">Actions</th>
                   </tr>
@@ -403,20 +515,18 @@ const UserManagement = () => {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan="4" className="px-4 py-12 text-center">
-                        <Loader2 className="animate-spin h-7 w-7 text-primary mx-auto" />
+                      <td colSpan="5" className="px-4 py-12 text-center">
+                        <Spinner className="h-7 w-7 text-primary mx-auto" />
                       </td>
                     </tr>
                   ) : filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan="4" className="px-4 py-12 text-center">
-                        <div className="mx-auto w-full max-w-sm space-y-2">
-                          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-                            <Users className="h-5 w-5" />
-                          </div>
-                          <div className="text-sm font-bold text-slate-800">No users found</div>
-                          <div className="text-xs text-slate-500">Try a different search or clear the filter.</div>
-                        </div>
+                      <td colSpan="5" className="px-4 py-12 text-center">
+                        <EmptyState
+                          icon={Users}
+                          title="No users found"
+                          description="Try a different search or clear the filter."
+                        />
                       </td>
                     </tr>
                   ) : (
@@ -427,19 +537,37 @@ const UserManagement = () => {
                         .slice(0, 2)
                         .toUpperCase();
                       const busy = rowBusyId === u._id;
+                      const avatarUpdatedAt = u?.profile?.avatarUpdatedAt || null;
+                      const avatarUrl = avatarUpdatedAt ? buildAvatarUrl(u._id, avatarUpdatedAt) : '';
+                      const showAvatar = Boolean(avatarUrl) && !avatarErrorById?.[u._id];
                       return (
                         <tr key={u._id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-muted/15 text-slate-800 font-extrabold">
-                                {initials}
-                              </div>
+                              {showAvatar ? (
+                                <img
+                                  src={avatarUrl}
+                                  alt={u.username ? `${u.username} avatar` : 'User avatar'}
+                                  className="h-10 w-10 rounded-2xl object-cover ring-1 ring-slate-200"
+                                  loading="lazy"
+                                  onError={() => setAvatarErrorById((prev) => ({ ...(prev || {}), [u._id]: true }))}
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-muted/15 text-slate-800 font-extrabold">
+                                  {initials}
+                                </div>
+                              )}
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <div className="truncate font-extrabold text-slate-900">{u.username}</div>
                                   {isSelf && (
                                     <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-primary-800">
                                       You
+                                    </span>
+                                  )}
+                                  {avatarUpdatedAt && !showAvatar && (
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                                      Logo
                                     </span>
                                   )}
                                 </div>
@@ -457,6 +585,9 @@ const UserManagement = () => {
                               {formatRole(u.role)}
                             </span>
                           </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700">
+                            {String(u?.profile?.department || '').trim() || ALL_DEPARTMENTS_LABEL}
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
                             {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                           </td>
@@ -469,18 +600,18 @@ const UserManagement = () => {
                                 className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 title="Edit user"
                               >
-                                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                                {busy ? <Spinner className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => openDelete(u)}
-                                disabled={busy || isSelf || isAdminUser}
+                                disabled={busy || isSelf}
                                 className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 title={
                                   isSelf
                                     ? 'You cannot delete your own account'
                                     : isAdminUser
-                                      ? 'Admin users cannot be deleted'
+                                      ? 'Delete admin user (requires password)'
                                       : 'Delete user'
                                 }
                               >
@@ -500,7 +631,7 @@ const UserManagement = () => {
       </div>
 
       {editUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Edit user">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <div>
@@ -529,7 +660,7 @@ const UserManagement = () => {
                     type="text"
                     value={editForm.username}
                     onChange={(e) => setEditForm((p) => ({ ...p, username: e.target.value }))}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-input"
                     required
                   />
                 </div>
@@ -543,7 +674,7 @@ const UserManagement = () => {
                     type="email"
                     value={editForm.email}
                     onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-input"
                     required
                   />
                 </div>
@@ -558,14 +689,10 @@ const UserManagement = () => {
                     id="edit-role"
                     value={editForm.role}
                     onChange={(e) => setEditForm((p) => ({ ...p, role: e.target.value }))}
-                    disabled={editUser.role === ROLES.ADMIN}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-select"
                   >
-                    {editUser.role === ROLES.ADMIN && (
-                      <option value={ROLES.ADMIN}>Admin</option>
-                    )}
                     {Object.entries(ROLES)
-                      .filter(([, value]) => value !== ROLES.PROCUREMENT && value !== ROLES.ADMIN)
+                      .filter(([, value]) => value !== ROLES.PROCUREMENT && (isCurrentAdmin ? true : value !== ROLES.ADMIN))
                       .map(([key, value]) => (
                         <option key={value} value={value}>
                           {key
@@ -588,16 +715,33 @@ const UserManagement = () => {
                     type="password"
                     value={editForm.password}
                     onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
-                    className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+                    className="app-input"
                     placeholder="Leave blank to keep"
                   />
                 </div>
               </div>
 
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700" htmlFor="edit-department">
+                  Department
+                </label>
+                <select
+                  id="edit-department"
+                  value={editForm.department}
+                  onChange={(e) => setEditForm((p) => ({ ...p, department: e.target.value }))}
+                  className="app-select"
+                >
+                  <option value={ALL_DEPARTMENTS_LABEL}>{ALL_DEPARTMENTS_LABEL}</option>
+                  {departments.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {editError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800" role="alert">
-                  {editError}
-                </div>
+                <Alert variant="error">{editError}</Alert>
               )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -605,16 +749,16 @@ const UserManagement = () => {
                   type="button"
                   onClick={closeEdit}
                   disabled={editSubmitting}
-                  className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="app-btn app-btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editSubmitting}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="app-btn app-btn-primary"
                 >
-                  {editSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {editSubmitting && <Spinner className="h-4 w-4" />}
                   Save changes
                 </button>
               </div>
@@ -624,7 +768,7 @@ const UserManagement = () => {
       )}
 
       {deleteUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Delete user">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
@@ -637,15 +781,39 @@ const UserManagement = () => {
             </div>
 
             <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              This action removes the user account and cannot be undone.
+              {deleteUser.role === ROLES.ADMIN
+                ? 'This is an Admin user. Enter your password to confirm deletion.'
+                : 'This action removes the user account and cannot be undone.'}
             </div>
+
+            {deleteUser.role === ROLES.ADMIN && (
+              <div className="mt-4 space-y-1">
+                <label className="text-xs font-bold text-slate-700" htmlFor="delete-admin-password">
+                  Your password
+                </label>
+                <input
+                  id="delete-admin-password"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="app-input"
+                  placeholder="Enter current password"
+                />
+              </div>
+            )}
+
+            {deleteError && (
+              <div className="mt-3">
+                <Alert variant="error">{deleteError}</Alert>
+              </div>
+            )}
 
             <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={closeDelete}
                 disabled={deleteSubmitting}
-                className="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="app-btn app-btn-secondary"
               >
                 Cancel
               </button>
@@ -653,9 +821,9 @@ const UserManagement = () => {
                 type="button"
                 onClick={submitDelete}
                 disabled={deleteSubmitting}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="app-btn app-btn-danger"
               >
-                {deleteSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deleteSubmitting && <Spinner className="h-4 w-4" />}
                 Delete
               </button>
             </div>

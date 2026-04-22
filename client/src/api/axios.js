@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL,
 });
 
 // Add a request interceptor to include the token
@@ -14,6 +16,21 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+const clearStoredToken = () => {
+  localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      clearStoredToken();
+    }
     return Promise.reject(error);
   }
 );

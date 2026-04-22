@@ -73,4 +73,93 @@
   .app-tab-idle {
     @apply text-slate-600 font-bold hover:bg-white/70;
   }
+
+  .app-label {
+    @apply block text-xs font-bold text-slate-600;
+  }
+
+  .app-help {
+    @apply mt-1 text-xs text-slate-500;
+  }
+
+  .app-input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition;
+    @apply focus:border-primary focus:ring-4 focus:ring-primary/15;
+    @apply disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+  }
+
+  .app-select {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition;
+    @apply focus:border-primary focus:ring-4 focus:ring-primary/15;
+    @apply disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+  }
+
+  .app-textarea {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition;
+    @apply focus:border-primary focus:ring-4 focus:ring-primary/15;
+    @apply disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+  }
+
+  .app-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold shadow-sm transition;
+    @apply disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .app-btn-primary {
+    @apply bg-primary text-white hover:bg-primary-700;
+  }
+
+  .app-btn-secondary {
+    @apply bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50;
+  }
+
+  .app-btn-ghost {
+    @apply bg-transparent text-slate-700 hover:bg-slate-100;
+  }
+
+  .app-btn-danger {
+    @apply bg-rose-600 text-white hover:bg-rose-700;
+  }
+
+  .app-icon-btn {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition;
+    @apply hover:bg-slate-50;
+    @apply disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .app-alert {
+    @apply rounded-xl border px-4 py-3 text-xs font-semibold;
+  }
+
+  .app-alert-error {
+    @apply border-rose-200 bg-rose-50 text-rose-800;
+  }
+
+  .app-alert-success {
+    @apply border-primary-100 bg-primary-50 text-primary-800;
+  }
+
+  .app-table {
+    @apply min-w-full divide-y divide-slate-200;
+  }
+
+  .app-thead {
+    @apply bg-slate-50;
+  }
+
+  .app-th {
+    @apply px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-slate-600;
+  }
+
+  .app-td {
+    @apply px-4 py-3 text-sm text-slate-700;
+  }
+
+  .app-tr {
+    @apply hover:bg-slate-50/70 transition-colors;
+  }
+
+  .app-skeleton {
+    @apply animate-pulse rounded-xl bg-slate-200/70;
+  }
 }

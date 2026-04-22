@@ -195,7 +195,7 @@ const SubmittedBom = () => {
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
   const isInventoryManager = user?.role === ROLES.INVENTORY_MANAGER;
   const userDept = normalizeDepartment(user?.profile?.department);
-  const lockDepartment = isProjectManager && userDept !== 'Unassigned';
+  const lockDepartment = isProjectManager && userDept !== 'Unassigned' && userDept !== 'All Departments';
 
   useEffect(() => {
     if (!lockDepartment) return;

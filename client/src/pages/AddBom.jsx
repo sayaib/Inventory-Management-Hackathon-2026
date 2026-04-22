@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, PlusCircle, Save, Trash2, Upload } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import api from '../api/axios';
 
 const APP_LOGO_URL =
@@ -82,8 +81,8 @@ const findHeaderKey = (headers, aliases) => {
   return '';
 };
 
-const parseWorksheetRows = (sheet) => {
-  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+const parseWorksheetRows = (sheet, xlsx) => {
+  const matrix = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
   const nonEmptyRows = matrix.filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
   if (nonEmptyRows.length === 0) return [];
 
@@ -298,11 +297,13 @@ const AddBom = () => {
     setSuccess('');
     try {
       const buffer = await file.arrayBuffer();
+      const xlsxModule = await import('xlsx');
+      const XLSX = xlsxModule.default ?? xlsxModule;
       const workbook = XLSX.read(buffer, { type: 'array' });
       const bomSheetName = workbook.SheetNames.find((name) => String(name || '').trim().toLowerCase() === 'bom');
       if (!bomSheetName) throw new Error('Sheet "BOM" not found in the uploaded file');
 
-      const parsedRows = parseWorksheetRows(workbook.Sheets[bomSheetName]);
+      const parsedRows = parseWorksheetRows(workbook.Sheets[bomSheetName], XLSX);
       const mappedRows = mapImportedRows(parsedRows, baseSrNo);
       if (mappedRows.length === 0) {
         throw new Error('No BOM rows found in sheet "BOM". Please make sure it has a header row and data rows.');

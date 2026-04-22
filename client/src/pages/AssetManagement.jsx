@@ -442,15 +442,15 @@ const AssetManagement = () => {
   };
 
   const adminNavItems = [
-    { key: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin' },
+    { key: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin/overview' },
+    { key: 'projectStatus', label: 'Project Status', icon: FolderKanban, href: '/admin/project-status' },
+    { key: 'prediction', label: 'Prediction', icon: BarChart3, href: '/admin/predictions' },
+    { key: 'users', label: 'Users', icon: Users, href: '/admin/users' },
+    { key: 'audit', label: 'Audit Logs', icon: History, href: '/admin/audit-logs' },
+    { key: 'reports', label: 'Reports', icon: BarChart3, href: '/admin/reports' },
+    { key: 'settings', label: 'Settings', icon: Settings, href: '/admin/settings' },
     { key: 'inventory', label: 'Inventory', icon: Package, href: '/inventory?from=admin' },
-    { key: 'projectStatus', label: 'Project Status', icon: FolderKanban, href: '/admin' },
-    { key: 'prediction', label: 'Prediction', icon: BarChart3, href: '/admin' },
-    { key: 'reports', label: 'Reports', icon: BarChart3, href: '/admin' },
-    { key: 'audit', label: 'Audit Logs', icon: History, href: '/admin' },
-    { key: 'users', label: 'Users', icon: Users, href: '/admin' },
-    { key: 'settings', label: 'Company', icon: Settings, href: '/admin' },
-    { key: 'profile', label: 'Profile', icon: UserIcon, href: '/admin' }
+    { key: 'profile', label: 'Profile', icon: UserIcon, href: '/profile?from=admin' }
   ];
 
   return (
@@ -460,7 +460,7 @@ const AssetManagement = () => {
           <div className="flex w-full flex-col py-4">
             <div className="px-3 mb-4 flex items-center gap-3">
               <Link
-                to="/admin"
+                to="/admin/overview"
                 aria-label="Go to admin home"
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm"
               >
@@ -524,7 +524,7 @@ const AssetManagement = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Link
-                  to="/admin"
+                  to="/admin/overview"
                   className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
                 >
                   <ArrowLeft className="h-4 w-4" />

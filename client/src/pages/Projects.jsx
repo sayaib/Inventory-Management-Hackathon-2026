@@ -205,7 +205,7 @@ const Projects = () => {
   const canEditBom = user?.role === ROLES.PRESALE;
   const canRaiseBomChangeRequest = [ROLES.PROJECT_MANAGER, ROLES.SALES_HEAD, ROLES.ADMIN, ROLES.INVENTORY_MANAGER].includes(user?.role);
   const userDept = normalizeDepartment(user?.profile?.department);
-  const lockDepartment = isProjectManager && userDept !== 'Unassigned';
+  const lockDepartment = isProjectManager && userDept !== 'Unassigned' && userDept !== 'All Departments';
 
   useEffect(() => {
     if (!lockDepartment) return;
