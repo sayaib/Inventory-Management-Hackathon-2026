@@ -1,9 +1,13 @@
 const express = require('express');
 const AuditLog = require('../models/AuditLog');
+const User = require('../models/User');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { ROLES } = require('../constants/roles');
 
 const router = express.Router();
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const HIDDEN_USER_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL);
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 router.get('/', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
   try {
@@ -42,6 +46,23 @@ router.get('/', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) 
         { 'entity.id': rx },
         { detailsText: rx }
       ];
+    }
+
+    const andConditions = [];
+    if (HIDDEN_USER_EMAIL) {
+      andConditions.push({ 'actor.email': { $ne: HIDDEN_USER_EMAIL } });
+      andConditions.push({ detailsText: { $not: { $regex: escapeRegex(HIDDEN_USER_EMAIL), $options: 'i' } } });
+
+      const hiddenUser = await User.findOne({ email: HIDDEN_USER_EMAIL }).select('_id').lean();
+      if (hiddenUser?._id) {
+        const hiddenUserId = String(hiddenUser._id);
+        andConditions.push({ 'actor.userId': { $ne: hiddenUserId } });
+        andConditions.push({ 'entity.id': { $ne: hiddenUserId } });
+      }
+    }
+
+    if (andConditions.length > 0) {
+      query.$and = andConditions;
     }
 
     const [logs, totalLogs] = await Promise.all([

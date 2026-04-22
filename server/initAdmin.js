@@ -8,6 +8,8 @@ const { ROLES } = require('./constants/roles');
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_db';
+const ADMIN_DEFAULT_DEPARTMENT = 'All Departments';
+const normalizeDepartment = (value) => (typeof value === 'string' ? value.trim() : '');
 
 const toBaseUsername = (email) => {
   const localPart = (email || '').split('@')[0] || 'admin';
@@ -38,6 +40,14 @@ const ensureAdminUser = async () => {
 
   const existingAdmin = await User.findOne({ email: adminEmail });
   if (existingAdmin) {
+    const existingDepartment = normalizeDepartment(existingAdmin.profile?.department);
+    if (!existingDepartment) {
+      existingAdmin.profile = {
+        ...(existingAdmin.profile?.toObject?.() || existingAdmin.profile || {}),
+        department: ADMIN_DEFAULT_DEPARTMENT
+      };
+      await existingAdmin.save();
+    }
     console.log(`Admin user already exists for ${adminEmail}`);
     return existingAdmin;
   }
@@ -49,7 +59,8 @@ const ensureAdminUser = async () => {
     username,
     email: adminEmail,
     password: adminPassword,
-    role: ROLES.ADMIN
+    role: ROLES.ADMIN,
+    profile: { department: ADMIN_DEFAULT_DEPARTMENT }
   });
 
   await admin.save();

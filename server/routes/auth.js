@@ -6,9 +6,24 @@ const { recordAuditLog } = require('../utils/recordAuditLog');
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const HIDDEN_USER_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL);
+const isHiddenUserEmail = (email) => Boolean(HIDDEN_USER_EMAIL) && normalizeEmail(email) === HIDDEN_USER_EMAIL;
+const ADMIN_DEFAULT_DEPARTMENT = 'All Departments';
 
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { ROLES } = require('../constants/roles');
+const normalizeDepartment = (value) => (typeof value === 'string' ? value.trim() : '');
+const withRoleDepartmentDefaults = (role, profile) => {
+  const nextProfile = { ...(profile || {}) };
+  const normalizedDepartment = normalizeDepartment(nextProfile.department);
+  if (role === ROLES.ADMIN && !normalizedDepartment) {
+    nextProfile.department = ADMIN_DEFAULT_DEPARTMENT;
+  } else if (nextProfile.department !== undefined) {
+    nextProfile.department = normalizedDepartment;
+  }
+  return nextProfile;
+};
 
 // Register (Public)
 router.post('/register', async (req, res) => {
@@ -34,7 +49,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    const parsedDepartment = typeof department === 'string' ? department.trim() : '';
+    const parsedDepartment = normalizeDepartment(department);
 
     const newUser = new User({
       username,
@@ -42,8 +57,9 @@ router.post('/register', async (req, res) => {
       password,
       role: role || ROLES.INVENTORY_MANAGER
     });
-    if (parsedDepartment) {
-      newUser.profile = { ...(newUser.profile?.toObject?.() || newUser.profile || {}), department: parsedDepartment };
+    const departmentToPersist = parsedDepartment || (newUser.role === ROLES.ADMIN ? ADMIN_DEFAULT_DEPARTMENT : '');
+    if (departmentToPersist) {
+      newUser.profile = { ...(newUser.profile?.toObject?.() || newUser.profile || {}), department: departmentToPersist };
     }
     await newUser.save();
 
@@ -110,7 +126,7 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        profile: sanitizeProfile(user.profile)
+        profile: sanitizeProfileForRole(user.role, user.profile)
       }
     });
   } catch (error) {
@@ -127,12 +143,14 @@ const sanitizeProfile = (profile) => {
   };
 };
 
+const sanitizeProfileForRole = (role, profile) => withRoleDepartmentDefaults(role, sanitizeProfile(profile));
+
 const sanitizeUser = (user) => {
   const raw = user?.toObject?.() || user || {};
   const { password, profile, ...rest } = raw;
   return {
     ...rest,
-    profile: sanitizeProfile(profile)
+    profile: sanitizeProfileForRole(rest.role, profile)
   };
 };
 
@@ -179,7 +197,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      profile: sanitizeProfile(user.profile)
+      profile: sanitizeProfileForRole(user.role, user.profile)
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch profile', error: error.message });
@@ -206,7 +224,10 @@ router.post('/profile', authMiddleware, async (req, res) => {
     }
 
     const incomingProfile = pickProfileFields(req.body || {});
-    user.profile = { ...(user.profile?.toObject?.() || user.profile || {}), ...incomingProfile };
+    user.profile = withRoleDepartmentDefaults(user.role, {
+      ...(user.profile?.toObject?.() || user.profile || {}),
+      ...incomingProfile
+    });
     await user.save();
 
     const safeUser = await User.findById(user._id).select('-password -profile.avatarImage.data');
@@ -245,7 +266,10 @@ router.put('/profile', authMiddleware, async (req, res) => {
     }
 
     const incomingProfile = pickProfileFields(req.body || {});
-    user.profile = { ...(user.profile?.toObject?.() || user.profile || {}), ...incomingProfile };
+    user.profile = withRoleDepartmentDefaults(user.role, {
+      ...(user.profile?.toObject?.() || user.profile || {}),
+      ...incomingProfile
+    });
     await user.save();
 
     const safeUser = await User.findById(user._id).select('-password -profile.avatarImage.data');
@@ -272,7 +296,7 @@ router.delete('/profile', authMiddleware, async (req, res) => {
 
     const cleared = {};
     for (const key of PROFILE_FIELDS) cleared[key] = '';
-    user.profile = { ...cleared, avatarImage: undefined };
+    user.profile = withRoleDepartmentDefaults(user.role, { ...cleared, avatarImage: undefined });
     await user.save();
 
     const safeUser = await User.findById(user._id).select('-password -profile.avatarImage.data');
@@ -363,8 +387,11 @@ router.delete('/profile/avatar', authMiddleware, async (req, res) => {
 router.get('/users/:id/avatar', async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id).select('profile.avatarImage');
+    const user = await User.findById(id).select('email profile.avatarImage');
     if (!user) return res.status(404).json({ message: 'User not found' });
+    if (isHiddenUserEmail(user.email)) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     const avatar = user.profile?.avatarImage;
     if (!avatar?.data || !avatar?.contentType) {
@@ -400,7 +427,8 @@ router.get('/users/:id/avatar', async (req, res) => {
 // Get All Users (Admin Only)
 router.get('/users', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
   try {
-    const users = await User.find().select('-password -profile.avatarImage.data');
+    const usersQuery = HIDDEN_USER_EMAIL ? { email: { $ne: HIDDEN_USER_EMAIL } } : {};
+    const users = await User.find(usersQuery).select('-password -profile.avatarImage.data');
     res.json(users.map((u) => sanitizeUser(u)));
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch users', error: error.message });
@@ -419,6 +447,9 @@ router.put('/users/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (r
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: 'User not found' });
+    if (isHiddenUserEmail(user.email)) {
+      return res.status(403).json({ message: 'This user cannot be modified' });
+    }
 
     const updates = {};
     const isDemotingAdmin = user.role === ROLES.ADMIN && role !== undefined && role !== ROLES.ADMIN;
@@ -454,9 +485,15 @@ router.put('/users/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (r
     }
 
     if (department !== undefined) {
-      const parsedDepartment = typeof department === 'string' ? department.trim() : '';
+      const parsedDepartment = normalizeDepartment(department);
       updates.department = parsedDepartment;
       user.profile = { ...(user.profile?.toObject?.() || user.profile || {}), department: parsedDepartment };
+    }
+
+    const existingDepartment = normalizeDepartment(user.profile?.department);
+    if (user.role === ROLES.ADMIN && !existingDepartment) {
+      updates.department = ADMIN_DEFAULT_DEPARTMENT;
+      user.profile = { ...(user.profile?.toObject?.() || user.profile || {}), department: ADMIN_DEFAULT_DEPARTMENT };
     }
 
     await user.save();
@@ -487,6 +524,9 @@ router.delete('/users/:id', authMiddleware, roleMiddleware([ROLES.ADMIN]), async
 
     const user = await User.findById(id).select('-password -profile.avatarImage.data');
     if (!user) return res.status(404).json({ message: 'User not found' });
+    if (isHiddenUserEmail(user.email)) {
+      return res.status(403).json({ message: 'This user cannot be deleted' });
+    }
 
     if (user.role === ROLES.ADMIN) {
       const adminCount = await User.countDocuments({ role: ROLES.ADMIN });
