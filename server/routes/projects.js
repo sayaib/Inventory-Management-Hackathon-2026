@@ -57,6 +57,15 @@ const canAccessProject = (req, project) => {
   const rawDepartment = String(req.user.profileDepartment || '').trim();
   const projectDept = normalizeDepartmentForCompare(project?.department);
 
+  if (req.user.role === ROLES.INVENTORY_MANAGER) {
+    if (scopedDepartment) {
+      const scopedKey = normalizeDepartmentForCompare(scopedDepartment);
+      if (!projectDept || projectDept !== scopedKey) return false;
+      return true;
+    }
+    return true;
+  }
+
   if (scopedDepartment) {
     const scopedKey = normalizeDepartmentForCompare(scopedDepartment);
     if (!projectDept || projectDept !== scopedKey) return false;
@@ -960,13 +969,73 @@ router.put('/:projectId/bom/:bomItemId', authMiddleware, attachUserProfileDepart
     ]);
     const payload = {};
     const isProjectManager = req.user?.role === ROLES.PROJECT_MANAGER;
+    const projectManagerAllowedKeys = new Set([
+      'inventoryStatus',
+      'inventoryAssetId',
+      'inventorySku',
+      'inventoryItemName',
+      'plannedQty',
+      'leadTimeWeeks',
+      'remarks'
+    ]);
     for (const [k, v] of Object.entries(rawPayload)) {
       if (isProjectManager) {
-        if (k === 'inventoryStatus') payload[k] = v;
+        if (projectManagerAllowedKeys.has(k)) payload[k] = v;
       } else if (allowedKeys.has(k)) {
         payload[k] = v;
       }
     }
+
+    if (isProjectManager) {
+      const savedAssetId = String(bomItem.inventoryAssetId || '').trim();
+      const savedSku = String(bomItem.inventorySku || '').trim();
+      const isStatusUtilized = String(bomItem.inventoryStatus || '') === 'Utilized';
+
+      let usedQuantity = 0;
+      if (savedAssetId || savedSku) {
+        const matchOr = [];
+        if (savedAssetId) matchOr.push({ assetId: savedAssetId });
+        if (savedSku) matchOr.push({ sku: savedSku });
+        const agg = await InventoryLog.aggregate([
+          { $match: { projectId: project._id, type: { $in: ['IN', 'OUT'] }, $or: matchOr } },
+          {
+            $group: {
+              _id: null,
+              usedQuantity: {
+                $sum: {
+                  $cond: [{ $eq: ['$type', 'OUT'] }, '$quantity', { $multiply: ['$quantity', -1] }]
+                }
+              }
+            }
+          }
+        ]);
+        usedQuantity = Math.max(0, Number(agg?.[0]?.usedQuantity || 0));
+      }
+
+      const isLocked = isStatusUtilized || usedQuantity > 0;
+
+      const nextAssetId = payload.inventoryAssetId !== undefined ? String(payload.inventoryAssetId || '').trim() : savedAssetId;
+      const nextSku = payload.inventorySku !== undefined ? String(payload.inventorySku || '').trim() : savedSku;
+      const nextItemName =
+        payload.inventoryItemName !== undefined
+          ? String(payload.inventoryItemName || '').trim()
+          : String(bomItem.inventoryItemName || '').trim();
+      const nextPlannedQty = payload.plannedQty !== undefined ? Number(payload.plannedQty || 0) : Number(bomItem.plannedQty || 0);
+
+      const beforeItemName = String(bomItem.inventoryItemName || '').trim();
+      const beforePlannedQty = Number(bomItem.plannedQty || 0);
+
+      const assignmentChanged =
+        savedAssetId !== nextAssetId
+        || savedSku !== nextSku
+        || beforeItemName !== nextItemName
+        || beforePlannedQty !== nextPlannedQty;
+
+      if (isLocked && assignmentChanged) {
+        return res.status(400).json({ message: 'Utilized BOM item assignment cannot be changed' });
+      }
+    }
+
     const current = bomItem.toObject ? bomItem.toObject() : { ...bomItem };
     const currentNormalized = buildBomItem(current);
     const normalized = buildBomItem({ ...current, ...payload });

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardList, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -152,6 +152,8 @@ const SubmittedBom = () => {
   const [expandedProjects, setExpandedProjects] = useState({});
   const [rowPlans, setRowPlans] = useState({});
   const [projectSummaries, setProjectSummaries] = useState({});
+  const [bomRowQueryByProject, setBomRowQueryByProject] = useState({});
+  const [bomTableView, setBomTableView] = useState('compact');
   const [activePickerKey, setActivePickerKey] = useState('');
   const [activeSearchTerm, setActiveSearchTerm] = useState('');
   const [assetSuggestions, setAssetSuggestions] = useState([]);
@@ -350,6 +352,10 @@ const SubmittedBom = () => {
       }
       return { ...prev, [id]: next };
     });
+  };
+
+  const setProjectBomQuery = (projectId, value) => {
+    setBomRowQueryByProject((prev) => ({ ...prev, [projectId]: value }));
   };
 
   const getRowKey = (projectId, bomItemIdOrIndex) => `${projectId}-${bomItemIdOrIndex}`;
@@ -645,7 +651,23 @@ const SubmittedBom = () => {
               <div className="text-base font-extrabold text-gray-900">Projects by Department</div>
               <div className="text-xs text-gray-500">Shows projects with submitted BOM items.</div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200/70 bg-white/60 backdrop-blur overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setBomTableView('compact')}
+                  className={`px-3 py-2 text-sm font-extrabold transition-all ${bomTableView === 'compact' ? 'bg-primary text-white' : 'text-slate-700 hover:bg-white/70'}`}
+                >
+                  Compact
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBomTableView('full')}
+                  className={`px-3 py-2 text-sm font-extrabold transition-all ${bomTableView === 'full' ? 'bg-primary text-white' : 'text-slate-700 hover:bg-white/70'}`}
+                >
+                  Full
+                </button>
+              </div>
               {lockDepartment ? (
                 <div className="px-3 py-2 text-sm bg-white/60 border border-slate-200/70 rounded-lg font-extrabold text-gray-700 backdrop-blur">
                   {userDept}
@@ -704,6 +726,30 @@ const SubmittedBom = () => {
                           if (sku && !bySku.has(sku)) bySku.set(sku, m);
                         }
 
+                        const bomQuery = String(bomRowQueryByProject[p._id] || '').trim().toLowerCase();
+                        const bomItems = Array.isArray(p.bomItems) ? p.bomItems : [];
+                        const bomFiltered = !bomQuery
+                          ? bomItems
+                          : bomItems.filter((b) => {
+                            const haystack = [
+                              b?.typeOfComponent,
+                              b?.srNo,
+                              b?.supplierName,
+                              b?.nomenclatureDescription,
+                              b?.partNoDrg,
+                              b?.make,
+                              b?.remarks,
+                              b?.inventoryItemName,
+                              b?.inventoryAssetId,
+                              b?.inventorySku,
+                              b?.inventoryStatus
+                            ]
+                              .filter(Boolean)
+                              .map((v) => String(v).toLowerCase())
+                              .join(' ');
+                            return haystack.includes(bomQuery);
+                          });
+
                         return (
                         <div key={p._id} className="px-4 py-3 hover:bg-white/50 transition-colors">
                           <div className="flex items-start justify-between gap-3">
@@ -729,38 +775,290 @@ const SubmittedBom = () => {
                             </div>
                           </div>
 
-                          {expandedProjects[p._id] && (p.bomItems?.length || 0) > 0 ? (
-                            <div className="mt-3 overflow-auto border border-gray-200 rounded-xl">
-                              <table className="min-w-[2150px] w-full text-[11px]">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                  <tr className="text-[11px] font-black text-gray-700">
-                                    <th className="px-2 py-2 text-left">Type of Component</th>
-                                    <th className="px-2 py-2 text-left">Sr. No.</th>
-                                    <th className="px-2 py-2 text-left">Supplier</th>
-                                    <th className="px-2 py-2 text-left">Nomenclature / Description</th>
-                                    <th className="px-2 py-2 text-left">Part No. / Drg.</th>
-                                    <th className="px-2 py-2 text-left">Make</th>
-                                    <th className="px-2 py-2 text-left">Qty/Board</th>
-                                    <th className="px-2 py-2 text-left">Board Req</th>
-                                    <th className="px-2 py-2 text-left">Spare qty</th>
-                                    <th className="px-2 py-2 text-left">Board Req+Spare</th>
-                                    <th className="px-2 py-2 text-left">Total Qty+Spare</th>
-                                    <th className="px-2 py-2 text-left">Unit cost</th>
-                                    <th className="px-2 py-2 text-left">Addl. cost</th>
-                                    <th className="px-2 py-2 text-left">Landing/unit</th>
-                                    <th className="px-2 py-2 text-left">Total price</th>
-                                    <th className="px-2 py-2 text-left">MOQ</th>
-                                    <th className="px-2 py-2 text-left">Lead time (weeks)</th>
-                                    <th className="px-2 py-2 text-left">Remarks</th>
-                                    <th className="px-2 py-2 text-left">Inventory (search)</th>
-                                    <th className="px-2 py-2 text-left">Planned qty</th>
-                                    <th className="px-2 py-2 text-left">Inventory status</th>
-                                    <th className="px-2 py-2 text-left">Utilization</th>
-                                    <th className="px-2 py-2 text-left">Save</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                  {(p.bomItems || []).map((b, i) => {
+                          {expandedProjects[p._id] && (bomItems.length || 0) > 0 ? (
+                            <div className="mt-3 space-y-2">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="text-[11px] text-gray-500 font-bold">
+                                  Showing {bomFiltered.length} / {bomItems.length} rows
+                                </div>
+                                <div className="sm:w-[360px]">
+                                  <input
+                                    value={String(bomRowQueryByProject[p._id] || '')}
+                                    onChange={(e) => setProjectBomQuery(p._id, e.target.value)}
+                                    placeholder="Search BOM rows…"
+                                    className="w-full px-3 py-2 text-sm bg-white/60 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 font-bold backdrop-blur"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="overflow-auto border border-gray-200 rounded-xl bg-white/50 backdrop-blur">
+                                {bomTableView === 'compact' ? (
+                                  <table className="min-w-[1200px] w-full text-[11px]">
+                                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                                      <tr className="text-[11px] font-black text-gray-700">
+                                        <th className="px-2 py-2 text-left">SR</th>
+                                        <th className="px-2 py-2 text-left">Description</th>
+                                        <th className="px-2 py-2 text-left">Remarks</th>
+                                        <th className="px-2 py-2 text-left">Inventory (search)</th>
+                                        <th className="px-2 py-2 text-left">Planned qty</th>
+                                        <th className="px-2 py-2 text-left">Inventory status</th>
+                                        <th className="px-2 py-2 text-left">Utilization</th>
+                                        <th className="px-2 py-2 text-left sticky right-0 bg-gray-50">Save</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {bomFiltered.map((b, i) => {
+                                        const rowKey = getRowKey(p._id, b?._id || i);
+                                        const plan = rowPlans[rowKey] || {};
+                                        const queryValue = plan.query ?? '';
+                                        const effectivePlannedQty = toNumberOrZero(plan.plannedQty ?? b.plannedQty ?? plan.lastSaved?.plannedQty ?? b.totalQtyWithSpare ?? 0);
+                                        const plannedQtyValue = String(plan.plannedQty ?? b.plannedQty ?? plan.lastSaved?.plannedQty ?? b.totalQtyWithSpare ?? '');
+                                        const selectedAsset = plan.selectedAsset;
+                                        const saving = Boolean(plan.saving);
+                                        const remarksValue = String(plan.remarks ?? b.remarks ?? plan.lastSaved?.remarks ?? '');
+
+                                        const effectiveInventoryLabel =
+                                          b.inventoryItemName ||
+                                          plan.lastSaved?.inventoryItemName ||
+                                          b.inventoryAssetId ||
+                                          plan.lastSaved?.inventoryAssetId ||
+                                          b.inventorySku ||
+                                          plan.lastSaved?.inventorySku ||
+                                          '';
+                                        const selectedAssetIdOrSku = selectedAsset?.assetId || selectedAsset?.sku || '';
+                                        const selectedAssetLabel = selectedAsset
+                                          ? `${selectedAsset.itemName || selectedAssetIdOrSku}${selectedAsset.itemName && selectedAssetIdOrSku ? ` (${selectedAssetIdOrSku})` : ''}`
+                                          : '';
+                                        const displayInventoryLabel =
+                                          selectedAssetLabel ||
+                                          effectiveInventoryLabel ||
+                                          '-';
+
+                                        const isSaved = Boolean(b.inventoryAssetId || b.inventorySku || plan.lastSaved?.inventoryAssetId || plan.lastSaved?.inventorySku) && effectivePlannedQty > 0;
+                                        const savedLinkAssetId = String(b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
+                                        const savedLinkSku = String(b.inventorySku || plan.lastSaved?.inventorySku || '');
+                                        const savedMatch = (savedLinkAssetId && byAssetId.get(savedLinkAssetId)) || (savedLinkSku && bySku.get(savedLinkSku)) || null;
+                                        const savedUsedQty = toNumberOrZero(savedMatch?.usedQuantity ?? 0);
+                                        const assignmentLocked = String(b.inventoryStatus || '') === 'Utilized' || savedUsedQty > 0;
+                                        const canEditRow = isInventoryManager || !assignmentLocked;
+                                        const isEditing = isInventoryManager ? Boolean(plan.isEditing) : ((Boolean(plan.isEditing) || !isSaved) && canEditRow);
+
+                                        const utilizationAssetId = String(selectedAsset?.assetId || b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
+                                        const utilizationSku = String(selectedAsset?.sku || b.inventorySku || plan.lastSaved?.inventorySku || '');
+                                        const hasLink = Boolean(utilizationAssetId || utilizationSku);
+                                        const match = (utilizationAssetId && byAssetId.get(utilizationAssetId)) || (utilizationSku && bySku.get(utilizationSku)) || null;
+                                        const usedQty = toNumberOrZero(match?.usedQuantity ?? 0);
+                                        const meta = getUtilizationMeta({ hasLink, plannedQty: effectivePlannedQty, usedQty });
+
+                                        const isAssigned = Boolean(savedLinkAssetId || savedLinkSku);
+                                        let statusLabel = b.inventoryStatus || '';
+                                        if (!statusLabel && isAssigned) statusLabel = 'Assigned';
+                                        const statusMeta = getInventoryStatusMeta(statusLabel, b);
+                                        const statusSaving = Boolean(plan.statusSaving);
+
+                                        return (
+                                          <tr key={`${p._id}-${String(b?._id || i)}`} className="align-top">
+                                            <td className="px-2 py-2 min-w-[60px] font-extrabold text-gray-900">{b.srNo}</td>
+                                            <td className="px-2 py-2 min-w-[260px]">
+                                              <div className="text-xs font-bold text-gray-900">{b.nomenclatureDescription || '-'}</div>
+                                              <div className="mt-0.5 text-[10px] text-gray-500 font-bold">
+                                                {b.partNoDrg ? `Part: ${b.partNoDrg}` : ''}{b.partNoDrg && b.make ? ' • ' : ''}{b.make ? `Make: ${b.make}` : ''}
+                                              </div>
+                                            </td>
+                                            <td className="px-2 py-2 min-w-[220px]">
+                                              {isEditing ? (
+                                                <input
+                                                  value={remarksValue}
+                                                  onChange={(e) => updateRowPlan(rowKey, { remarks: e.target.value })}
+                                                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                                />
+                                              ) : (
+                                                <div className="text-xs font-bold text-gray-800">{b.remarks || '-'}</div>
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-2 min-w-[320px]">
+                                              {isEditing ? (
+                                                <div>
+                                                  <input
+                                                    data-picker-key={rowKey}
+                                                    value={queryValue}
+                                                    onChange={(e) => {
+                                                      const next = e.target.value;
+                                                      updateRowPlan(rowKey, { query: next, selectedAsset: null });
+                                                      openPicker(rowKey, next, e.currentTarget);
+                                                    }}
+                                                    onFocus={(e) => {
+                                                      openPicker(rowKey, queryValue, e.currentTarget);
+                                                    }}
+                                                    placeholder="Search inventory by name / assetId / sku"
+                                                    className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                                  />
+                                                  {selectedAsset ? (
+                                                    <div className="mt-1 text-[11px] text-gray-500 font-bold">
+                                                      Selected: {selectedAssetLabel} • Avl: {selectedAsset.availableQuantity}
+                                                    </div>
+                                                  ) : null}
+                                                  {!selectedAsset && effectiveInventoryLabel ? (
+                                                    <div className="mt-1 text-[11px] text-gray-500 font-bold">
+                                                      Saved: {effectiveInventoryLabel}
+                                                    </div>
+                                                  ) : null}
+                                                </div>
+                                              ) : (
+                                                <div className="text-xs font-bold text-gray-800">{displayInventoryLabel || '-'}</div>
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-2 min-w-[120px]">
+                                              {isEditing ? (
+                                                <input
+                                                  value={plannedQtyValue}
+                                                  onChange={(e) => updateRowPlan(rowKey, { plannedQty: e.target.value })}
+                                                  inputMode="decimal"
+                                                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary font-bold"
+                                                />
+                                              ) : (
+                                                <div className="text-xs font-bold text-gray-800">{b.plannedQty ?? plan.lastSaved?.plannedQty ?? 0}</div>
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-2 min-w-[190px]">
+                                              <div className="space-y-2">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${statusMeta.className}`}>
+                                                  {statusMeta.label}
+                                                </span>
+                                                {isProjectManager && isAssigned && (
+                                                  <div className="flex flex-wrap gap-1 mt-1">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleSetBomStatus(p._id, i, b, 'Utilized')}
+                                                      disabled={statusSaving}
+                                                      className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-primary text-white hover:bg-primary-700 transition-all disabled:opacity-50"
+                                                    >
+                                                      Utilized
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleSetBomStatus(p._id, i, b, 'Non Utilized')}
+                                                      disabled={statusSaving}
+                                                      className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-gray-500 text-white hover:bg-gray-600 transition-all disabled:opacity-50"
+                                                    >
+                                                      Non Utilized
+                                                    </button>
+                                                  </div>
+                                                )}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleSetNeedToPurchase(p._id, i, b)}
+                                                  disabled={statusSaving || isAssigned || statusLabel === 'Need to Purchase'}
+                                                  className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50"
+                                                >
+                                                  {statusSaving ? 'Updating…' : 'Need to Purchase'}
+                                                </button>
+                                              </div>
+                                            </td>
+                                            <td className="px-2 py-2 min-w-[170px]">
+                                              {summaryLoading ? (
+                                                <div className="text-[11px] font-bold text-gray-500">Loading…</div>
+                                              ) : summaryError ? (
+                                                <div className="text-[11px] font-bold text-red-600">{summaryError}</div>
+                                              ) : (
+                                                <div className="space-y-1">
+                                                  <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black ${meta.className}`}>
+                                                    {meta.label}
+                                                  </span>
+                                                  {hasLink ? (
+                                                    <div className="text-[10px] text-gray-500 font-bold">
+                                                      Used {formatQty(usedQty)} / {formatQty(effectivePlannedQty || 0)}
+                                                    </div>
+                                                  ) : (
+                                                    <div className="text-[10px] text-gray-400 font-bold">—</div>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-2 min-w-[120px] sticky right-0 bg-white/80 backdrop-blur">
+                                              {isEditing ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleSavePlanned(p._id, i, b)}
+                                                  disabled={saving || (!isInventoryManager && assignmentLocked)}
+                                                  className="px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs hover:bg-primary-700 transition-all disabled:opacity-50"
+                                                >
+                                                  {!isInventoryManager && assignmentLocked ? 'Locked' : (saving ? 'Saving…' : (isSaved ? 'Update' : 'Save'))}
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => updateRowPlan(rowKey, {
+                                                    isEditing: true,
+                                                    ...(isInventoryManager
+                                                      ? {
+                                                        typeOfComponent: b.typeOfComponent ?? '',
+                                                        srNo: b.srNo ?? 0,
+                                                        supplierName: b.supplierName ?? '',
+                                                        nomenclatureDescription: b.nomenclatureDescription ?? '',
+                                                        partNoDrg: b.partNoDrg ?? '',
+                                                        make: b.make ?? '',
+                                                        qtyPerBoard: b.qtyPerBoard ?? 0,
+                                                        boardReq: b.boardReq ?? 0,
+                                                        spareQty: b.spareQty ?? 0,
+                                                        unitCost: b.unitCost ?? 0,
+                                                        additionalCost: b.additionalCost ?? 0,
+                                                        moq: b.moq ?? 0,
+                                                        inventoryAssetId: b.inventoryAssetId ?? '',
+                                                        inventorySku: b.inventorySku ?? '',
+                                                        inventoryItemName: b.inventoryItemName ?? ''
+                                                      }
+                                                      : {}),
+                                                    leadTimeWeeks: b.leadTimeWeeks ?? plan.lastSaved?.leadTimeWeeks ?? 0,
+                                                    remarks: b.remarks ?? plan.lastSaved?.remarks ?? '',
+                                                    plannedQty: b.plannedQty ?? plan.lastSaved?.plannedQty ?? b.totalQtyWithSpare ?? 0,
+                                                    query: b.inventoryItemName
+                                                      ? `${b.inventoryItemName}${b.inventorySku || b.inventoryAssetId ? ` (${b.inventorySku || b.inventoryAssetId})` : ''}`
+                                                      : (b.inventorySku || b.inventoryAssetId || '')
+                                                  })}
+                                                  disabled={!isInventoryManager && assignmentLocked}
+                                                  className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50"
+                                                >
+                                                  Edit
+                                                </button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <table className="min-w-[2150px] w-full text-[11px]">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                      <tr className="text-[11px] font-black text-gray-700">
+                                        <th className="px-2 py-2 text-left">Type of Component</th>
+                                        <th className="px-2 py-2 text-left">Sr. No.</th>
+                                        <th className="px-2 py-2 text-left">Supplier</th>
+                                        <th className="px-2 py-2 text-left">Nomenclature / Description</th>
+                                        <th className="px-2 py-2 text-left">Part No. / Drg.</th>
+                                        <th className="px-2 py-2 text-left">Make</th>
+                                        <th className="px-2 py-2 text-left">Qty/Board</th>
+                                        <th className="px-2 py-2 text-left">Board Req</th>
+                                        <th className="px-2 py-2 text-left">Spare qty</th>
+                                        <th className="px-2 py-2 text-left">Board Req+Spare</th>
+                                        <th className="px-2 py-2 text-left">Total Qty+Spare</th>
+                                        <th className="px-2 py-2 text-left">Unit cost</th>
+                                        <th className="px-2 py-2 text-left">Addl. cost</th>
+                                        <th className="px-2 py-2 text-left">Landing/unit</th>
+                                        <th className="px-2 py-2 text-left">Total price</th>
+                                        <th className="px-2 py-2 text-left">MOQ</th>
+                                        <th className="px-2 py-2 text-left">Lead time (weeks)</th>
+                                        <th className="px-2 py-2 text-left">Remarks</th>
+                                        <th className="px-2 py-2 text-left">Inventory (search)</th>
+                                        <th className="px-2 py-2 text-left">Planned qty</th>
+                                        <th className="px-2 py-2 text-left">Inventory status</th>
+                                        <th className="px-2 py-2 text-left">Utilization</th>
+                                        <th className="px-2 py-2 text-left">Save</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {bomFiltered.map((b, i) => {
                                     const rowKey = getRowKey(p._id, b?._id || i);
                                     const plan = rowPlans[rowKey] || {};
                                     const queryValue = plan.query ?? '';
@@ -812,7 +1110,13 @@ const SubmittedBom = () => {
                                       plan.lastSaved?.plannedQty ??
                                       '';
                                     const isSaved = Boolean(b.inventoryAssetId || b.inventorySku || plan.lastSaved?.inventoryAssetId || plan.lastSaved?.inventorySku) && effectivePlannedQty > 0;
-                                    const isEditing = isInventoryManager ? Boolean(plan.isEditing) : (Boolean(plan.isEditing) || !isSaved);
+                                    const savedLinkAssetId = String(b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
+                                    const savedLinkSku = String(b.inventorySku || plan.lastSaved?.inventorySku || '');
+                                    const savedMatch = (savedLinkAssetId && byAssetId.get(savedLinkAssetId)) || (savedLinkSku && bySku.get(savedLinkSku)) || null;
+                                    const savedUsedQty = toNumberOrZero(savedMatch?.usedQuantity ?? 0);
+                                    const assignmentLocked = String(b.inventoryStatus || '') === 'Utilized' || savedUsedQty > 0;
+                                    const canEditRow = isInventoryManager || !assignmentLocked;
+                                    const isEditing = isInventoryManager ? Boolean(plan.isEditing) : ((Boolean(plan.isEditing) || !isSaved) && canEditRow);
 
                                     const utilizationAssetId = String(selectedAsset?.assetId || b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
                                     const utilizationSku = String(selectedAsset?.sku || b.inventorySku || plan.lastSaved?.inventorySku || '');
@@ -820,9 +1124,6 @@ const SubmittedBom = () => {
                                     const match = (utilizationAssetId && byAssetId.get(utilizationAssetId)) || (utilizationSku && bySku.get(utilizationSku)) || null;
                                     const usedQty = toNumberOrZero(match?.usedQuantity ?? 0);
                                     const meta = getUtilizationMeta({ hasLink, plannedQty: effectivePlannedQty, usedQty });
-
-                                    const savedLinkAssetId = String(b.inventoryAssetId || plan.lastSaved?.inventoryAssetId || '');
-                                    const savedLinkSku = String(b.inventorySku || plan.lastSaved?.inventorySku || '');
                                     const isAssigned = Boolean(savedLinkAssetId || savedLinkSku);
                                     let statusLabel = b.inventoryStatus || '';
                                     if (!statusLabel && isAssigned) statusLabel = 'Assigned';
@@ -1104,10 +1405,10 @@ const SubmittedBom = () => {
                                           <button
                                             type="button"
                                             onClick={() => handleSavePlanned(p._id, i, b)}
-                                            disabled={saving}
+                                            disabled={saving || (!isInventoryManager && assignmentLocked)}
                                             className="px-3 py-2 rounded-lg bg-primary text-white font-bold text-xs hover:bg-primary-700 transition-all disabled:opacity-50"
                                           >
-                                            {saving ? 'Saving…' : (isSaved ? 'Update' : 'Save')}
+                                            {!isInventoryManager && assignmentLocked ? 'Locked' : (saving ? 'Saving…' : (isSaved ? 'Update' : 'Save'))}
                                           </button>
                                         ) : (
                                           <button
@@ -1140,7 +1441,8 @@ const SubmittedBom = () => {
                                                 ? `${b.inventoryItemName}${b.inventorySku || b.inventoryAssetId ? ` (${b.inventorySku || b.inventoryAssetId})` : ''}`
                                                 : (b.inventorySku || b.inventoryAssetId || '')
                                             })}
-                                            className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-xs hover:bg-gray-200 transition-all"
+                                            disabled={!isInventoryManager && assignmentLocked}
+                                            className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-xs hover:bg-gray-200 transition-all disabled:opacity-50"
                                           >
                                             Edit
                                           </button>
@@ -1149,8 +1451,10 @@ const SubmittedBom = () => {
                                     </tr>
                                     );
                                   })}
-                                </tbody>
-                              </table>
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
                             </div>
                           ) : null}
                         </div>

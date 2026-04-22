@@ -615,7 +615,7 @@ const AssetManagement = () => {
                 </button>
               </div>
 
-              {(user?.role === ROLES.INVENTORY_MANAGER || user?.role === ROLES.ADMIN) && (
+              {user?.role === ROLES.INVENTORY_MANAGER && (
                 <Link
                   to="/inventory/submitted-bom"
                   className="px-4 py-2 rounded-xl font-extrabold text-sm transition-all shadow-sm bg-white text-primary border border-primary-200 hover:bg-primary-50"

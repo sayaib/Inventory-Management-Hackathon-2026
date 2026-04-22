@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
 const { ensureAdminUser, ensureDummyInventory } = require('./initAdmin');
 
 dotenv.config();
@@ -25,8 +27,24 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 
-// Basic Route
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+const hasClientDist =
+  fs.existsSync(clientDistPath) && fs.existsSync(path.join(clientDistPath, 'index.html'));
+
+if (hasClientDist) {
+  app.use(express.static(clientDistPath));
+}
+
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true });
+});
+
 app.get('/', (req, res) => {
+  if (hasClientDist) {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+    return;
+  }
+
   res.send('Inventory Management API is running...');
 });
 
@@ -43,6 +61,15 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/settings', settingsRoutes);
+
+app.use((req, res, next) => {
+  if (!hasClientDist || req.path.startsWith('/api/')) {
+    next();
+    return;
+  }
+
+  res.sendFile(path.join(clientDistPath, 'index.html'));
+});
 
 app.use((err, req, res, next) => {
   const status = Number(err?.statusCode || err?.status || 500);

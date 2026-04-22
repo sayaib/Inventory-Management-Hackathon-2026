@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ClipboardList, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { ROLES } from '../constants/roles';
@@ -40,6 +40,7 @@ const BomChangeRequest = () => {
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedBomItemId, setSelectedBomItemId] = useState('');
+  const [bomSheetQuery, setBomSheetQuery] = useState('');
   const [proposed, setProposed] = useState({
     typeOfComponent: '',
     supplierName: '',
@@ -136,6 +137,43 @@ const BomChangeRequest = () => {
     return bomItems.find((b) => String(b?._id) === String(selectedBomItemId)) || null;
   }, [bomItems, selectedBomItemId]);
 
+  useEffect(() => {
+    if (!selectedBomItem) {
+      setProposed({
+        typeOfComponent: '',
+        supplierName: '',
+        nomenclatureDescription: '',
+        partNoDrg: '',
+        make: '',
+        qtyPerBoard: '',
+        boardReq: '',
+        spareQty: '',
+        unitCost: '',
+        additionalCost: '',
+        moq: '',
+        leadTimeWeeks: '',
+        remarks: ''
+      });
+      return;
+    }
+
+    setProposed({
+      typeOfComponent: selectedBomItem.typeOfComponent || '',
+      supplierName: selectedBomItem.supplierName || '',
+      nomenclatureDescription: selectedBomItem.nomenclatureDescription || '',
+      partNoDrg: selectedBomItem.partNoDrg || '',
+      make: selectedBomItem.make || '',
+      qtyPerBoard: String(selectedBomItem.qtyPerBoard ?? ''),
+      boardReq: String(selectedBomItem.boardReq ?? ''),
+      spareQty: String(selectedBomItem.spareQty ?? ''),
+      unitCost: String(selectedBomItem.unitCost ?? ''),
+      additionalCost: String(selectedBomItem.additionalCost ?? ''),
+      moq: String(selectedBomItem.moq ?? ''),
+      leadTimeWeeks: String(selectedBomItem.leadTimeWeeks ?? ''),
+      remarks: selectedBomItem.remarks || ''
+    });
+  }, [selectedBomItemId, selectedBomItem]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) return;
@@ -169,6 +207,21 @@ const BomChangeRequest = () => {
     for (const k of numberKeys) {
       const v = toNumberOrUndefined(proposed?.[k]);
       if (v !== undefined) proposedChanges[k] = v;
+    }
+
+    if (selectedBomItem) {
+      const next = {};
+      for (const [k, v] of Object.entries(proposedChanges)) {
+        if (typeof v === 'number') {
+          const before = Number(selectedBomItem?.[k] || 0);
+          if (Number(before) !== Number(v)) next[k] = v;
+        } else {
+          const before = String(selectedBomItem?.[k] || '').trim();
+          if (before !== String(v || '').trim()) next[k] = v;
+        }
+      }
+      for (const k of Object.keys(proposedChanges)) delete proposedChanges[k];
+      Object.assign(proposedChanges, next);
     }
 
     if (!selectedBomItemId && Object.keys(proposedChanges).length === 0) {
@@ -224,6 +277,30 @@ const BomChangeRequest = () => {
       .slice()
       .sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime());
   }, [requests]);
+
+  const filteredBomSheet = useMemo(() => {
+    const q = String(bomSheetQuery || '').trim().toLowerCase();
+    if (!q) return bomItems;
+    return bomItems.filter((b) => {
+      const haystack = [
+        b?.typeOfComponent,
+        b?.srNo,
+        b?.supplierName,
+        b?.nomenclatureDescription,
+        b?.partNoDrg,
+        b?.make,
+        b?.remarks,
+        b?.inventoryItemName,
+        b?.inventoryAssetId,
+        b?.inventorySku,
+        b?.inventoryStatus
+      ]
+        .filter(Boolean)
+        .map((v) => String(v).toLowerCase())
+        .join(' ');
+      return haystack.includes(q);
+    });
+  }, [bomItems, bomSheetQuery]);
 
   const formatDateTime = (value) => {
     if (!value) return '';
@@ -378,7 +455,6 @@ const BomChangeRequest = () => {
                     placeholder="Any extra context for presales/procurement/approvers"
                   />
                 </div>
-Add category
                 <div className="border border-slate-200/70 rounded-2xl p-4 space-y-3 bg-white/40 backdrop-blur">
                   <div className="text-sm font-extrabold text-gray-900">Proposed Changes</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -538,6 +614,100 @@ Add category
               </div>
             )}
           </div>
+        </div>
+
+        <div className="app-card p-6 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-base font-extrabold text-gray-900">BOM Sheet</div>
+              <div className="text-xs text-gray-500 font-bold">Click a row to select the BOM item for change request.</div>
+            </div>
+            <div className="sm:w-[360px]">
+              <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">Search</div>
+              <input
+                value={bomSheetQuery}
+                onChange={(e) => setBomSheetQuery(e.target.value)}
+                placeholder="Search BOM…"
+                className="w-full px-3 py-2 text-sm bg-white/70 border border-slate-200/70 rounded-lg outline-none focus:ring-2 focus:ring-primary/40 backdrop-blur"
+                disabled={!selectedProjectId || loadingProject}
+              />
+            </div>
+          </div>
+
+          {!selectedProjectId ? (
+            <div className="text-sm text-gray-600">Select a project to view its BOM sheet.</div>
+          ) : loadingProject ? (
+            <div className="text-sm text-gray-600">Loading BOM…</div>
+          ) : filteredBomSheet.length === 0 ? (
+            <div className="text-sm text-gray-600">No BOM items found.</div>
+          ) : (
+            <div className="overflow-auto border border-slate-200/70 rounded-2xl bg-white/60 backdrop-blur">
+              <table className="min-w-[2200px] w-full text-xs">
+                <thead className="bg-slate-50/80 border-b border-slate-200/70 sticky top-0 z-10">
+                  <tr className="text-[11px] font-black text-gray-700">
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Type of Component</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Sr. No.</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Supplier Name</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Nomenclature / Description</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Part No. / Drg.</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Make</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Qty/Board</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Board Req</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Spare qty</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Total Qty+Spare</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Unit cost</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Addl. cost</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">MOQ</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Lead time (weeks)</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Remarks</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Asset ID</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Inventory SKU</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Inventory Item Name</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Planned Qty</th>
+                    <th className="px-2 py-2 text-left whitespace-nowrap">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredBomSheet.map((b) => {
+                    const isSelected = String(b?._id) === String(selectedBomItemId);
+                    return (
+                      <tr
+                        key={b._id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedBomItemId(String(b._id))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') setSelectedBomItemId(String(b._id));
+                        }}
+                        className={`cursor-pointer align-top ${isSelected ? 'bg-primary-50/70' : 'hover:bg-white/70'}`}
+                      >
+                        <td className="px-2 py-2 min-w-[180px] font-bold text-gray-800">{b.typeOfComponent || '-'}</td>
+                        <td className="px-2 py-2 min-w-[90px] font-extrabold text-gray-900">{b.srNo}</td>
+                        <td className="px-2 py-2 min-w-[180px] text-gray-800">{b.supplierName || '-'}</td>
+                        <td className="px-2 py-2 min-w-[260px] text-gray-800">{b.nomenclatureDescription || '-'}</td>
+                        <td className="px-2 py-2 min-w-[180px] text-gray-800">{b.partNoDrg || '-'}</td>
+                        <td className="px-2 py-2 min-w-[140px] text-gray-800">{b.make || '-'}</td>
+                        <td className="px-2 py-2 min-w-[100px] text-gray-800">{b.qtyPerBoard ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[100px] text-gray-800">{b.boardReq ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[100px] text-gray-800">{b.spareQty ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[130px] text-gray-800">{b.totalQtyWithSpare ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[110px] text-gray-800">{b.unitCost ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[110px] text-gray-800">{b.additionalCost ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[80px] text-gray-800">{b.moq ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[120px] text-gray-800">{b.leadTimeWeeks ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[220px] text-gray-800">{b.remarks || '-'}</td>
+                        <td className="px-2 py-2 min-w-[150px] text-gray-800">{b.inventoryAssetId || '-'}</td>
+                        <td className="px-2 py-2 min-w-[140px] text-gray-800">{b.inventorySku || '-'}</td>
+                        <td className="px-2 py-2 min-w-[200px] text-gray-800">{b.inventoryItemName || '-'}</td>
+                        <td className="px-2 py-2 min-w-[110px] text-gray-800">{b.plannedQty ?? 0}</td>
+                        <td className="px-2 py-2 min-w-[110px] text-gray-800">{b.inventoryStatus || '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="app-card p-6 space-y-4">
