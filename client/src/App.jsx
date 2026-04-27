@@ -9,6 +9,7 @@ const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
 const AdminProjectStatus = lazy(() => import('./pages/admin/AdminProjectStatus'));
+const AdminProjectBom = lazy(() => import('./pages/admin/AdminProjectBom'));
 const AdminPredictions = lazy(() => import('./pages/admin/AdminPredictions'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminAuditLogs = lazy(() => import('./pages/admin/AdminAuditLogs'));
@@ -68,6 +69,8 @@ function App() {
               <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
               <Route path="/admin/overview" element={<AdminOverview />} />
               <Route path="/admin/project-status" element={<AdminProjectStatus />} />
+              <Route path="/admin/project-bom" element={<AdminProjectBom />} />
+              <Route path="/admin/project-bom/:projectId/view" element={<ViewBom />} />
               <Route path="/admin/predictions" element={<AdminPredictions />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />

@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('path');
 
 const User = require('./models/User');
 const Asset = require('./models/Asset');
 const { ROLES } = require('./constants/roles');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/inventory_db';
 const ADMIN_DEFAULT_DEPARTMENT = 'All Departments';

@@ -7,8 +7,10 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
-const HIDDEN_USER_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL);
+const HIDDEN_USER_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL || 'admin@optimized.solutions');
 const isHiddenUserEmail = (email) => Boolean(HIDDEN_USER_EMAIL) && normalizeEmail(email) === HIDDEN_USER_EMAIL;
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const sanitizeEmailForClient = (email) => (isHiddenUserEmail(email) ? '' : email);
 const ADMIN_DEFAULT_DEPARTMENT = 'All Departments';
 
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
@@ -105,7 +107,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role, username: user.username, email: user.email },
+      { id: user._id, role: user.role, username: user.username, email: sanitizeEmailForClient(user.email) },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -124,7 +126,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
-        email: user.email,
+        email: sanitizeEmailForClient(user.email),
         role: user.role,
         profile: sanitizeProfileForRole(user.role, user.profile)
       }
@@ -150,6 +152,7 @@ const sanitizeUser = (user) => {
   const { password, profile, ...rest } = raw;
   return {
     ...rest,
+    email: sanitizeEmailForClient(rest.email),
     profile: sanitizeProfileForRole(rest.role, profile)
   };
 };
@@ -195,7 +198,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
     res.json({
       id: user._id,
       username: user.username,
-      email: user.email,
+      email: sanitizeEmailForClient(user.email),
       role: user.role,
       profile: sanitizeProfileForRole(user.role, user.profile)
     });
@@ -427,9 +430,11 @@ router.get('/users/:id/avatar', async (req, res) => {
 // Get All Users (Admin Only)
 router.get('/users', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
   try {
-    const usersQuery = HIDDEN_USER_EMAIL ? { email: { $ne: HIDDEN_USER_EMAIL } } : {};
+    const usersQuery = HIDDEN_USER_EMAIL
+      ? { email: { $not: new RegExp(`^${escapeRegex(HIDDEN_USER_EMAIL)}$`, 'i') } }
+      : {};
     const users = await User.find(usersQuery).select('-password -profile.avatarImage.data');
-    res.json(users.map((u) => sanitizeUser(u)));
+    res.json(users.filter((u) => !isHiddenUserEmail(u.email)).map((u) => sanitizeUser(u)));
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch users', error: error.message });
   }

@@ -44,6 +44,11 @@ const AdminPanel = ({ initialTab }) => {
   const [projectStatusSearch, setProjectStatusSearch] = useState('');
   const [projectStatusDept, setProjectStatusDept] = useState('all');
   const [projectStatusExpanded, setProjectStatusExpanded] = useState({});
+  const [projectBomRows, setProjectBomRows] = useState([]);
+  const [projectBomLoading, setProjectBomLoading] = useState(false);
+  const [projectBomError, setProjectBomError] = useState('');
+  const [projectBomSearch, setProjectBomSearch] = useState('');
+  const [projectBomDept, setProjectBomDept] = useState('all');
   const [inventoryStatusProjectId, setInventoryStatusProjectId] = useState('');
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState('all');
   const [reportDept, setReportDept] = useState('all');
@@ -192,6 +197,7 @@ const AdminPanel = ({ initialTab }) => {
     const routeToTab = {
       overview: 'overview',
       'project-status': 'projectStatus',
+      'project-bom': 'projectBom',
       predictions: 'prediction',
       users: 'users',
       'audit-logs': 'audit',
@@ -580,9 +586,56 @@ const AdminPanel = ({ initialTab }) => {
     }
   };
 
+  const fetchProjectBoms = async () => {
+    setProjectBomLoading(true);
+    setProjectBomError('');
+    try {
+      const res = await api.get('/projects');
+      const list = Array.isArray(res.data?.projects) ? res.data.projects : [];
+      const rows = list
+        .filter((p) => Array.isArray(p?.bomItems) && p.bomItems.length > 0)
+        .map((p) => {
+          const items = Array.isArray(p?.bomItems) ? p.bomItems : [];
+          let totalPrice = 0;
+          let lastBomAt = null;
+          for (const it of items) {
+            const rowPrice = Number(it?.totalPrice || 0);
+            if (Number.isFinite(rowPrice)) totalPrice += rowPrice;
+            const updated = it?.updatedAt ? new Date(it.updatedAt) : it?.createdAt ? new Date(it.createdAt) : null;
+            if (updated && !Number.isNaN(updated.getTime())) {
+              if (!lastBomAt || updated > lastBomAt) lastBomAt = updated;
+            }
+          }
+          totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
+          return {
+            id: String(p?._id || ''),
+            code: p?.code || '',
+            name: p?.name || '',
+            department: p?.department || '',
+            status: p?.status || '',
+            bomItemCount: items.length,
+            bomTotalPrice: totalPrice,
+            bomLastUpdatedAt: lastBomAt ? lastBomAt.toISOString() : null,
+            bomItems: items
+          };
+        })
+        .sort((a, b) => String(b?.bomLastUpdatedAt || '').localeCompare(String(a?.bomLastUpdatedAt || '')));
+      setProjectBomRows(rows);
+    } catch (err) {
+      setProjectBomError(err.response?.data?.message || 'Failed to fetch project BOMs');
+    } finally {
+      setProjectBomLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== 'overview' && activeTab !== 'projectStatus' && activeTab !== 'reports') return;
     fetchProjectStatuses();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'projectBom') return;
+    fetchProjectBoms();
   }, [activeTab]);
 
   useEffect(() => {
@@ -691,6 +744,7 @@ const AdminPanel = ({ initialTab }) => {
   const navItems = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin/overview' },
     { key: 'projectStatus', label: 'Project Status', icon: FolderKanban, href: '/admin/project-status' },
+    { key: 'projectBom', label: 'Project BOM', icon: Package, href: '/admin/project-bom' },
     { key: 'prediction', label: 'Prediction', icon: BarChart3, href: '/admin/predictions' },
     { key: 'users', label: 'Users', icon: Users, href: '/admin/users' },
     { key: 'audit', label: 'Audit Logs', icon: History, href: '/admin/audit-logs' },
@@ -827,8 +881,8 @@ const AdminPanel = ({ initialTab }) => {
   return (
     <div className="min-h-screen app-bg admin-panel">
       <div className="flex min-h-screen w-full">
-        <aside className="hidden w-60 shrink-0 border-r border-slate-800/40 bg-slate-950 text-slate-100 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
-          <div className="flex items-center gap-3 px-4 py-4">
+        <aside className="hidden w-64 shrink-0 border-r border-slate-800/40 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-slate-100 shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)] lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
+          <div className="flex items-center gap-3 border-b border-white/5 px-4 py-4">
             <Link
               to="/dashboard"
               aria-label="Go to dashboard home"
@@ -848,8 +902,8 @@ const AdminPanel = ({ initialTab }) => {
             </div>
           </div>
 
-          <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-2">
-            <div className="space-y-1">
+          <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3">
+            <div className="space-y-1.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.key;
@@ -858,12 +912,27 @@ const AdminPanel = ({ initialTab }) => {
                     key={item.key}
                     to={item.href}
                     className={[
-                      'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
-                      isActive ? 'bg-primary/20 text-white' : 'text-slate-200 hover:bg-white/5 hover:text-white'
+                      'group relative w-full overflow-hidden flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none transition',
+                      'focus-visible:ring-4 focus-visible:ring-primary/25',
+                      isActive ? 'bg-white/10 text-white shadow-sm' : 'text-slate-200 hover:bg-white/5 hover:text-white'
                     ].join(' ')}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    <Icon className="h-4 w-4" />
+                    <span
+                      aria-hidden="true"
+                      className={[
+                        'absolute inset-y-2 left-0 w-1 rounded-r transition-opacity',
+                        isActive ? 'bg-primary opacity-100' : 'bg-white/30 opacity-0 group-hover:opacity-100'
+                      ].join(' ')}
+                    />
+                    <span
+                      className={[
+                        'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                        isActive ? 'bg-primary/25 text-white' : 'bg-white/5 text-slate-100 group-hover:bg-white/10'
+                      ].join(' ')}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
                     <span className="truncate">{item.label}</span>
                   </Link>
                 );
@@ -872,8 +941,8 @@ const AdminPanel = ({ initialTab }) => {
           </nav>
 
           <div className="border-t border-slate-800/40 p-3">
-            <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-slate-100 shadow-sm">
+            <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-slate-100 ring-1 ring-white/10 shadow-sm">
                 <UserIcon className="h-4 w-4" />
               </div>
               <div className="min-w-0">
@@ -884,7 +953,7 @@ const AdminPanel = ({ initialTab }) => {
             <button
               type="button"
               onClick={logout}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-slate-100 transition hover:bg-white/10"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-bold text-slate-100 ring-1 ring-white/10 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
             >
               <LogOut className="h-4 w-4" />
               Sign out
@@ -892,13 +961,13 @@ const AdminPanel = ({ initialTab }) => {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 lg:ml-60">
-          <header className="sticky top-0 z-10 app-nav">
+        <main className="min-w-0 flex-1 lg:ml-64">
+          <header className="sticky top-0 z-10 app-nav shadow-sm shadow-slate-900/5">
             <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
-                  className="app-icon-btn lg:hidden"
+                  className="app-icon-btn lg:!hidden"
                   onClick={() => setMobileNavOpen(true)}
                   aria-label="Open navigation"
                 >
@@ -934,7 +1003,7 @@ const AdminPanel = ({ initialTab }) => {
                 aria-label="Close navigation"
                 onClick={() => setMobileNavOpen(false)}
               />
-              <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-slate-200 bg-white shadow-2xl">
+              <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-slate-200 bg-white/90 shadow-2xl backdrop-blur">
                 <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
@@ -957,7 +1026,7 @@ const AdminPanel = ({ initialTab }) => {
                 </div>
 
                 <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2 pb-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {navItems.map((item) => {
                       const Icon = item.icon;
                       const isActive = activeTab === item.key;
@@ -967,12 +1036,27 @@ const AdminPanel = ({ initialTab }) => {
                           to={item.href}
                           onClick={() => setMobileNavOpen(false)}
                           className={[
-                            'w-full flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-extrabold transition',
+                            'group relative w-full overflow-hidden flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-extrabold outline-none transition',
+                            'focus-visible:ring-4 focus-visible:ring-primary/15',
                             isActive ? 'bg-primary/10 text-primary-800' : 'text-slate-700 hover:bg-slate-50'
                           ].join(' ')}
                           aria-current={isActive ? 'page' : undefined}
                         >
-                          <Icon className="h-4 w-4" />
+                          <span
+                            aria-hidden="true"
+                            className={[
+                              'absolute inset-y-2 left-0 w-1 rounded-r transition-opacity',
+                              isActive ? 'bg-primary opacity-100' : 'bg-slate-300 opacity-0 group-hover:opacity-100'
+                            ].join(' ')}
+                          />
+                          <span
+                            className={[
+                              'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                              isActive ? 'bg-primary/15 text-primary-800' : 'bg-slate-100 text-slate-700 group-hover:bg-slate-200'
+                            ].join(' ')}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
                           <span className="truncate">{item.label}</span>
                         </Link>
                       );
@@ -1547,6 +1631,135 @@ const AdminPanel = ({ initialTab }) => {
                   </div>
                 </div>
 
+              </div>
+            )}
+
+            {activeTab === 'projectBom' && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-extrabold text-slate-900">Project BOM</h2>
+                      <p className="text-xs text-slate-500">View every submitted project BOM with department and status.</p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <input
+                        value={projectBomSearch}
+                        onChange={(e) => setProjectBomSearch(e.target.value)}
+                        placeholder="Search by code/name/department…"
+                        className="h-9 w-full sm:w-72 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      />
+                      <select
+                        value={projectBomDept}
+                        onChange={(e) => setProjectBomDept(e.target.value)}
+                        className="h-9 w-full sm:w-52 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                      >
+                        {(() => {
+                          const depts = Array.from(
+                            new Set((projectBomRows || []).map((p) => String(p?.department || '').trim()).filter(Boolean))
+                          ).sort((a, b) => a.localeCompare(b));
+                          return [
+                            <option key="all" value="all">All departments</option>,
+                            ...depts.map((d) => <option key={d} value={d}>{d}</option>)
+                          ];
+                        })()}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetchProjectBoms();
+                        }}
+                        className="h-9 w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-extrabold text-slate-700 hover:bg-slate-100"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {projectBomError && (
+                  <div className="app-alert app-alert-error text-sm font-bold">{projectBomError}</div>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="border-b border-slate-200 px-4 py-3">
+                    <div className="text-xs font-bold text-slate-600">
+                      {projectBomLoading ? 'Loading…' : `${projectBomRows.length} projects`}
+                    </div>
+                  </div>
+                  <div className="w-full overflow-auto">
+                    {(() => {
+                      const q = projectBomSearch.trim().toLowerCase();
+                      const rows = (projectBomRows || []).filter((p) => {
+                        const dept = String(p?.department || '').trim();
+                        if (projectBomDept !== 'all' && dept !== projectBomDept) return false;
+                        if (!q) return true;
+                        const hay = `${p?.code || ''} ${p?.name || ''} ${dept}`.toLowerCase();
+                        return hay.includes(q);
+                      });
+
+                      return (
+                        <table className="app-table min-w-[1200px] w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr className="text-[11px] font-extrabold text-slate-700">
+                              <th className="px-4 py-3">Project</th>
+                              <th className="px-4 py-3">Department</th>
+                              <th className="px-4 py-3">Project status</th>
+                              <th className="px-4 py-3">BOM items</th>
+                              <th className="px-4 py-3">BOM value</th>
+                              <th className="px-4 py-3">Last BOM update</th>
+                              <th className="px-4 py-3"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {projectBomLoading ? (
+                              <tr>
+                                <td className="px-4 py-4 text-slate-500" colSpan={7}>Loading…</td>
+                              </tr>
+                            ) : rows.length === 0 ? (
+                              <tr>
+                                <td className="px-4 py-4 text-slate-500" colSpan={7}>No submitted BOM projects found.</td>
+                              </tr>
+                            ) : (
+                              rows.map((p) => {
+                                const projectId = String(p?.id || p?._id || p?.code || '');
+                                const items = Array.isArray(p?.bomItems) ? p.bomItems : [];
+                                const dept = String(p?.department || '').trim() || '-';
+                                const status = String(p?.status || '').replace('_', ' ') || '-';
+                                const total = formatRupees(Number(p?.bomTotalPrice || 0));
+                                return (
+                                  <Fragment key={projectId || p?.id || p?._id || p?.code}>
+                                    <tr className="hover:bg-slate-50/70">
+                                      <td className="px-4 py-3">
+                                        <div className="font-extrabold text-slate-900">{p?.code || '-'}</div>
+                                        <div className="text-[11px] font-semibold text-slate-600">{p?.name || ''}</div>
+                                      </td>
+                                      <td className="px-4 py-3 text-[11px] font-extrabold text-slate-700">{dept}</td>
+                                      <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{status}</td>
+                                      <td className="px-4 py-3 text-[11px] font-semibold text-slate-700">{items.length}</td>
+                                      <td className="px-4 py-3 text-[11px] font-extrabold text-slate-900">{total}</td>
+                                      <td className="px-4 py-3 text-[11px] font-semibold text-slate-600">
+                                        {formatDateTime(p?.bomLastUpdatedAt)}
+                                      </td>
+                                      <td className="px-4 py-3">
+                                        <Link
+                                          to={`/admin/project-bom/${encodeURIComponent(projectId)}/view`}
+                                          className="h-7 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-extrabold text-slate-700 hover:bg-slate-50"
+                                        >
+                                          View BOM
+                                        </Link>
+                                      </td>
+                                    </tr>
+                                  </Fragment>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
             )}
 

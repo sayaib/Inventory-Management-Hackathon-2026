@@ -6,7 +6,7 @@ const { ROLES } = require('../constants/roles');
 
 const router = express.Router();
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
-const HIDDEN_USER_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL);
+const HIDDEN_USER_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL || 'admin@optimized.solutions');
 const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 router.get('/', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {

@@ -396,6 +396,45 @@ router.get('/status/overview', authMiddleware, roleMiddleware([ROLES.ADMIN]), as
   }
 });
 
+router.get('/bom/submitted', authMiddleware, roleMiddleware([ROLES.ADMIN]), async (req, res) => {
+  try {
+    const projects = await Project.find({ 'bomItems.0': { $exists: true } })
+      .select('code name department status bomItems updatedAt createdAt')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const output = (projects || []).map((p) => {
+      const items = Array.isArray(p?.bomItems) ? p.bomItems : [];
+      let totalPrice = 0;
+      let lastBomAt = null;
+      for (const it of items) {
+        const rowPrice = Number(it?.totalPrice || 0);
+        if (Number.isFinite(rowPrice)) totalPrice += rowPrice;
+        const updated = it?.updatedAt ? new Date(it.updatedAt) : it?.createdAt ? new Date(it.createdAt) : null;
+        if (updated && !Number.isNaN(updated.getTime())) {
+          if (!lastBomAt || updated > lastBomAt) lastBomAt = updated;
+        }
+      }
+      totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
+      return {
+        id: String(p?._id || ''),
+        code: p?.code || '',
+        name: p?.name || '',
+        department: p?.department || '',
+        status: p?.status || '',
+        bomItemCount: items.length,
+        bomTotalPrice: totalPrice,
+        bomLastUpdatedAt: lastBomAt ? lastBomAt.toISOString() : null,
+        bomItems: items
+      };
+    });
+
+    res.json({ projects: output });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch submitted project BOMs', error: error.message });
+  }
+});
+
 router.get('/:projectId', authMiddleware, attachUserProfileDepartment, canViewProjects, async (req, res) => {
   try {
     const project = await Project.findById(req.params.projectId);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -88,8 +88,11 @@ const getInventoryStatusMeta = (bomItem) => {
 const ViewBom = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const isProjectManager = user?.role === ROLES.PROJECT_MANAGER;
+  const isAdminProjectBom = String(location.pathname || '').startsWith('/admin/project-bom/');
+  const dashboardPath = isAdminProjectBom ? '/admin/project-bom' : '/bom';
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -145,14 +148,20 @@ const ViewBom = () => {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  if (isAdminProjectBom) {
+                    navigate(dashboardPath);
+                    return;
+                  }
+                  navigate(-1);
+                }}
                 className="flex items-center gap-2 text-gray-500 hover:text-primary transition-all duration-200 font-medium text-sm"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </button>
               <Link
-                to="/bom"
+                to={dashboardPath}
                 className="text-gray-500 hover:text-primary transition-all duration-200 font-medium text-sm"
               >
                 BOM Dashboard

@@ -8,6 +8,9 @@ import Alert from './ui/Alert';
 import EmptyState from './ui/EmptyState';
 import Spinner from './ui/Spinner';
 
+const HIDDEN_USER_EMAIL = 'admin@optimized.solutions';
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 const UserManagement = () => {
   const { user: currentUser } = useAuth();
   const currentUserId = currentUser?.id || currentUser?._id;
@@ -50,8 +53,11 @@ const UserManagement = () => {
       setTableError('');
       setLoading(true);
       const res = await api.get('/auth/users');
-      setUsers(res.data);
-      return Array.isArray(res.data) ? res.data : [];
+      const nextUsers = Array.isArray(res.data)
+        ? res.data.filter((u) => normalizeEmail(u?.email) !== HIDDEN_USER_EMAIL)
+        : [];
+      setUsers(nextUsers);
+      return nextUsers;
     } catch (err) {
       setTableError(err.response?.data?.message || 'Failed to fetch users');
       return [];
@@ -164,6 +170,15 @@ const UserManagement = () => {
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return filtered;
   }, [users, search, roleFilter, departmentFilter]);
+
+  const roleCounts = useMemo(() => {
+    const counts = new Map();
+    for (const u of users || []) {
+      const role = String(u?.role || '').trim() || 'UNKNOWN';
+      counts.set(role, (counts.get(role) || 0) + 1);
+    }
+    return counts;
+  }, [users]);
 
   const openPanel = (mode) => {
     setPanelMode(mode);
@@ -346,7 +361,7 @@ const UserManagement = () => {
           className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
           aria-label="Close details"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" strokeWidth={2.25} />
         </button>
       </div>
 
@@ -356,7 +371,7 @@ const UserManagement = () => {
             <EmptyState icon={User} title="Select a user" description="Pick a user from the list to view details, or create a new account." />
             <div className="mt-4 flex justify-center">
               <button type="button" onClick={startCreate} className="app-btn app-btn-primary">
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-4 w-4" strokeWidth={2.25} />
                 New user
               </button>
             </div>
@@ -380,7 +395,7 @@ const UserManagement = () => {
                   required
                   value={formData.username}
                   onChange={handleChange}
-                  className="app-input pl-10"
+                  className="app-input !pl-10"
                   placeholder="e.g. warehouse-admin"
                 />
               </div>
@@ -401,7 +416,7 @@ const UserManagement = () => {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="app-input pl-10"
+                  className="app-input !pl-10"
                   placeholder="name@company.com"
                 />
               </div>
@@ -518,7 +533,7 @@ const UserManagement = () => {
             {panelMode === 'view' && (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button type="button" onClick={() => startEdit(selectedUser)} className="app-btn app-btn-secondary">
-                  <Pencil className="h-4 w-4" />
+                  <Pencil className="h-4 w-4" strokeWidth={2.25} />
                   Edit
                 </button>
                 <button
@@ -528,7 +543,7 @@ const UserManagement = () => {
                   className="app-btn app-btn-danger"
                   title={currentUserId && String(currentUserId) === String(selectedUser._id) ? 'You cannot delete your own account' : 'Delete user'}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" strokeWidth={2.25} />
                   Delete
                 </button>
               </div>
@@ -647,65 +662,81 @@ const UserManagement = () => {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-gradient-to-r from-primary via-primary-700 to-accent p-[1px] shadow-[0_18px_55px_-28px_rgba(2,6,23,0.45)]">
-        <div className="rounded-2xl bg-white px-4 py-4 sm:px-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary-700">
-                <Shield className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Admin</div>
-                <h2 className="text-lg font-extrabold text-slate-900">User Management</h2>
-              </div>
+      <div className="app-card-strong px-4 py-4 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-white shadow-sm">
+              <Shield className="h-5 w-5" strokeWidth={2.25} />
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                <Users className="h-3.5 w-3.5" />
-                {loading ? 'Loading…' : `${users.length} users`}
-              </span>
-              <button
-                type="button"
-                onClick={fetchUsers}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw className={['h-3.5 w-3.5', loading ? 'animate-spin' : ''].join(' ')} />
-                Refresh
-              </button>
+            <div className="min-w-0">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Admin</div>
+              <h2 className="truncate text-lg font-extrabold text-slate-900">User Management</h2>
+              <div className="mt-1 text-xs text-slate-600">Create accounts, manage roles, and control access.</div>
             </div>
           </div>
 
-          <div className="mt-3 text-sm text-slate-600">
-            Create accounts, update roles, or remove users from the system.
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={startCreate} className="app-btn app-btn-primary px-3 py-2">
+              <UserPlus className="h-4 w-4" strokeWidth={2.25} />
+              New user
+            </button>
+            <button
+              type="button"
+              onClick={fetchUsers}
+              disabled={loading}
+              className="app-btn app-btn-secondary px-3 py-2"
+            >
+              <RefreshCw className={['h-4 w-4', loading ? 'animate-spin' : ''].join(' ')} strokeWidth={2.25} />
+              Refresh
+            </button>
           </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-700">
+            <Users className="h-4 w-4 text-slate-700" strokeWidth={2.25} />
+            {loading ? 'Loading…' : `${users.length} Total`}
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-extrabold text-primary-800">
+            <Shield className="h-4 w-4" strokeWidth={2.25} />
+            {roleCounts.get(ROLES.ADMIN) || 0} Admin
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-700">
+            <User className="h-4 w-4 text-slate-700" strokeWidth={2.25} />
+            {(roleCounts.get(ROLES.PROJECT_MANAGER) || 0) + (roleCounts.get(ROLES.INVENTORY_MANAGER) || 0)} Managers
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full bg-muted-50 px-3 py-1 text-xs font-extrabold text-muted-800">
+            <Mail className="h-4 w-4" strokeWidth={2.25} />
+            {roleCounts.get(ROLES.FINANCE) || 0} Finance
+          </span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="app-card-strong overflow-hidden">
             <div className="border-b border-slate-200 px-4 py-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900">Directory</h3>
                   <p className="text-xs text-slate-500">Search, filter, and select a user to manage details.</p>
                 </div>
-                <button type="button" onClick={startCreate} className="app-btn app-btn-primary">
-                  <UserPlus className="h-4 w-4" />
-                  New user
-                </button>
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-slate-700 ring-1 ring-slate-200">
+                    {filteredUsers.length} results
+                  </span>
+                </div>
               </div>
 
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" strokeWidth={2.25} />
                   <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search username or email…"
-                    className="app-input pl-9 pr-9"
+                    className="app-input !pl-9 !pr-9"
                   />
                   {search.trim().length > 0 && (
                     <button
@@ -714,7 +745,7 @@ const UserManagement = () => {
                       className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                       aria-label="Clear search"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-3.5 w-3.5" strokeWidth={2.25} />
                     </button>
                   )}
                 </div>
@@ -772,15 +803,15 @@ const UserManagement = () => {
               </div>
             )}
 
-            <div className="hidden sm:block overflow-x-auto">
+            <div className="hidden sm:block max-h-[68vh] overflow-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600 text-xs uppercase tracking-wide">
                   <tr>
-                    <th className="px-4 py-3 font-bold">User</th>
-                    <th className="px-4 py-3 font-bold">Role</th>
-                    <th className="px-4 py-3 font-bold">Department</th>
-                    <th className="px-4 py-3 font-bold">Joined</th>
-                    <th className="px-4 py-3 font-bold text-right">Actions</th>
+                    <th className="px-4 py-2.5 font-extrabold">User</th>
+                    <th className="px-4 py-2.5 font-extrabold">Role</th>
+                    <th className="px-4 py-2.5 font-extrabold">Department</th>
+                    <th className="px-4 py-2.5 font-extrabold">Joined</th>
+                    <th className="px-4 py-2.5 font-extrabold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -812,23 +843,23 @@ const UserManagement = () => {
                         <tr
                           key={u._id}
                           className={[
-                            'hover:bg-slate-50/70 transition-colors cursor-pointer',
+                            'cursor-pointer transition-colors hover:bg-slate-50/70',
                             isSelected ? 'bg-primary-50/40' : ''
                           ].join(' ')}
                           onClick={() => selectUser(u)}
                         >
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2.5">
                             <div className="flex items-center gap-3">
                               {showAvatar ? (
                                 <img
                                   src={avatarUrl}
                                   alt={u.username ? `${u.username} avatar` : 'User avatar'}
-                                  className="h-10 w-10 rounded-2xl object-cover ring-1 ring-slate-200"
+                                  className="h-9 w-9 rounded-2xl object-cover ring-1 ring-slate-200"
                                   loading="lazy"
                                   onError={() => setAvatarErrorById((prev) => ({ ...(prev || {}), [u._id]: true }))}
                                 />
                               ) : (
-                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-muted/15 text-slate-800 font-extrabold">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 via-primary/10 to-muted/15 text-slate-800 font-extrabold">
                                   {initials}
                                 </div>
                               )}
@@ -845,7 +876,7 @@ const UserManagement = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <span
                               className={[
                                 'px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide',
@@ -855,13 +886,13 @@ const UserManagement = () => {
                               {formatRole(u.role)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-700">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-slate-700">
                             {String(u?.profile?.department || '').trim() || ALL_DEPARTMENTS_LABEL}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-slate-500">
                             {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-right">
                             <div className="inline-flex items-center gap-1">
                               <button
                                 type="button"
@@ -870,10 +901,10 @@ const UserManagement = () => {
                                   startEdit(u);
                                 }}
                                 disabled={busy}
-                                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 hover:text-primary-800 disabled:cursor-not-allowed disabled:opacity-60"
                                 title="Edit user"
                               >
-                                {busy ? <Spinner className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                                {busy ? <Spinner className="h-4 w-4" /> : <Pencil className="h-4 w-4" strokeWidth={2.25} />}
                               </button>
                               <button
                                 type="button"
@@ -882,12 +913,12 @@ const UserManagement = () => {
                                   openDelete(u);
                                 }}
                                 disabled={busy || isSelf}
-                                className="inline-flex items-center justify-center rounded-xl p-2 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 title={
                                   isSelf ? 'You cannot delete your own account' : isAdminUser ? 'Delete admin user (requires password)' : 'Delete user'
                                 }
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" strokeWidth={2.25} />
                               </button>
                             </div>
                           </td>
@@ -968,7 +999,7 @@ const UserManagement = () => {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
-                <Trash2 className="h-5 w-5" />
+                <Trash2 className="h-5 w-5" strokeWidth={2.25} />
               </div>
               <div className="min-w-0">
                 <div className="text-lg font-extrabold text-slate-900">Delete user?</div>

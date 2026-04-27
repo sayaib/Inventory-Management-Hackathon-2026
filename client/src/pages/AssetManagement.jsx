@@ -444,6 +444,7 @@ const AssetManagement = () => {
   const adminNavItems = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard, href: '/admin/overview' },
     { key: 'projectStatus', label: 'Project Status', icon: FolderKanban, href: '/admin/project-status' },
+    { key: 'projectBom', label: 'Project BOM', icon: Package, href: '/admin/project-bom' },
     { key: 'prediction', label: 'Prediction', icon: BarChart3, href: '/admin/predictions' },
     { key: 'users', label: 'Users', icon: Users, href: '/admin/users' },
     { key: 'audit', label: 'Audit Logs', icon: History, href: '/admin/audit-logs' },
@@ -456,9 +457,8 @@ const AssetManagement = () => {
   return (
     <div className={fromAdmin ? 'min-h-screen bg-slate-50 flex' : 'min-h-screen bg-gradient-to-b from-primary-50/40 via-white to-muted-50/40'}>
       {fromAdmin && (
-        <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-60 bg-slate-950 text-slate-100 border-r border-white/10">
-          <div className="flex w-full flex-col py-4">
-            <div className="px-3 mb-4 flex items-center gap-3">
+        <aside className="hidden w-64 shrink-0 border-r border-slate-800/40 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 text-slate-100 shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)] lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
+          <div className="flex items-center gap-3 border-b border-white/5 px-4 py-4">
               <Link
                 to="/admin/overview"
                 aria-label="Go to admin home"
@@ -478,8 +478,8 @@ const AssetManagement = () => {
               </div>
             </div>
 
-            <nav className="flex-1 px-3 py-2">
-              <div className="space-y-1">
+            <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3">
+              <div className="space-y-1.5">
                 {adminNavItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = item.key === 'inventory';
@@ -488,11 +488,26 @@ const AssetManagement = () => {
                       key={item.key}
                       to={item.href}
                       className={[
-                        'w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
+                        'group relative w-full overflow-hidden flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none transition',
+                        'focus-visible:ring-4 focus-visible:ring-primary/25',
                         isActive ? 'bg-white/10 text-white shadow-sm' : 'text-slate-200 hover:bg-white/5 hover:text-white'
                       ].join(' ')}
                     >
-                      <Icon className="h-4 w-4" />
+                      <span
+                        aria-hidden="true"
+                        className={[
+                          'absolute inset-y-2 left-0 w-1 rounded-r transition-opacity',
+                          isActive ? 'bg-primary opacity-100' : 'bg-white/30 opacity-0 group-hover:opacity-100'
+                        ].join(' ')}
+                      />
+                      <span
+                        className={[
+                          'inline-flex h-8 w-8 items-center justify-center rounded-xl transition',
+                          isActive ? 'bg-primary/25 text-white' : 'bg-white/5 text-slate-100 group-hover:bg-white/10'
+                        ].join(' ')}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
                       <span className="truncate">{item.label}</span>
                     </Link>
                   );
@@ -500,23 +515,22 @@ const AssetManagement = () => {
               </div>
             </nav>
 
-            <div className="px-3">
-              <button
-                type="button"
-                onClick={logout}
-                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-slate-100 transition hover:bg-white/10"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign out
-              </button>
-            </div>
+          <div className="border-t border-slate-800/40 p-3">
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm font-bold text-slate-100 ring-1 ring-white/10 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
           </div>
         </aside>
       )}
 
-      <div className={fromAdmin ? 'min-w-0 flex-1 lg:ml-60' : 'w-full'}>
+      <div className={fromAdmin ? 'min-w-0 flex-1 lg:ml-64' : 'w-full'}>
         {fromAdmin ? (
-          <header className="sticky top-0 z-20 app-nav">
+          <header className="sticky top-0 z-20 app-nav shadow-sm shadow-slate-900/5">
             <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6">
               <div className="min-w-0">
                 <h1 className="truncate text-base font-extrabold text-slate-900">Inventory</h1>
